@@ -1,6 +1,15 @@
+2/1/2023:
+* [simple Seq2Seq w/ Attention (Pytorch)](https://github.com/graykode/nlp-tutorial)
+
 
 1/30/2023
-* Dataset: https://huggingface.co/datasets/europarl_bilingual (21 languages)
+* Dataset: https://huggingface.co/datasets/europarl_bilingual (21 languages) - only has train set, download directly from [Europarl](https://opus.nlpl.eu/Europarl.php) otherwise. Command:
+```python
+!pip install datasets
+from datasets import list_datasets, load_dataset
+print('europarl_bilingual' in list_datasets())
+dataset = load_dataset("europarl_bilingual", lang1="en", lang2="fr")  # https://huggingface.co/datasets/europarl_bilingual
+```
 * Models:
     * [mbart-large-cc25](https://huggingface.co/facebook/mbart-large-cc25)
     * [Helsinki-NLP](https://huggingface.co/Helsinki-NLP)
