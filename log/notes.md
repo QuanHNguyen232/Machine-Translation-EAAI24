@@ -10,6 +10,13 @@ Next week:
     * how to make merging system feasible (critical problem that must be solved)
 * Try metrics systems
 ---
+2/5/2023:
+* Tutorial:
+    * [Pytorch Seq2Seq Tutorial for Machine Translation](https://www.youtube.com/watch?v=EoGUlvhRYpk) ---> [Pytorch Seq2Seq with Attention for Machine Translation](https://www.youtube.com/watch?v=sQUqQddQtB4)
+* Tokenizer:
+    * Spacy ([spacy.io](https://spacy.io/usage/models))
+    * NLTK ([StackOverflow](https://stackoverflow.com/questions/15111183/what-languages-are-supported-for-nltk-word-tokenize-and-nltk-pos-tag))
+* Add embeddings to nn.Embedding ([Medium](https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76) OR [StackOverflow](https://stackoverflow.com/questions/49710537/pytorch-gensim-how-do-i-load-pre-trained-word-embeddings/49802495#49802495) OR [androidkt.com](https://androidkt.com/pre-train-word-embedding-in-pytorch/))
 
 2/2/2023:
 * Word embeddings:
