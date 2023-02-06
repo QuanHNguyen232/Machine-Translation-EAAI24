@@ -10,6 +10,40 @@ Next week:
     * how to make merging system feasible (critical problem that must be solved)
 * Try metrics systems
 ---
+
+2/6/2023:
+* Data EDA:
+   * Length: Most sentences have length of < 128 words/sent ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer) ----> reduce computational cost:
+      * Result:
+      ![Eng sent length](en-sent-len.png)
+      ![Fre sent length](fr-sent-len.png)
+      * Code:
+```python
+max_len_en = defaultdict(int)
+max_len_fr = defaultdict(int)
+for i, pair in enumerate(dataset['train']):
+  pair = pair['translation']
+
+  sent_en = pair['en']
+  sent_en = sent_en.split(' ')
+  max_len_en[len(sent_en)] += 1
+
+  sent_fr = pair['fr']
+  sent_fr = sent_fr.split(' ')
+  max_len_fr[len(sent_fr)] += 1
+  
+sort_en = sorted(max_len_en.items(), key=lambda x:x[0])
+sort_fr = sorted(max_len_fr.items(), key=lambda x:x[0])
+sort_en_key = [key for key, val in sort_en]
+sort_en_val = [val for key, val in sort_en]
+sort_fr_key = [key for key, val in sort_fr]
+sort_fr_val = [val for key, val in sort_fr]
+
+plt.plot(sort_en_key, sort_en_val)
+plt.plot(sort_fr_key, sort_fr_val)
+```
+
+
 2/5/2023:
 * Tutorial:
     * [Pytorch Seq2Seq Tutorial for Machine Translation](https://www.youtube.com/watch?v=EoGUlvhRYpk) ---> [Pytorch Seq2Seq with Attention for Machine Translation](https://www.youtube.com/watch?v=sQUqQddQtB4)
@@ -17,6 +51,9 @@ Next week:
     * Spacy ([spacy.io](https://spacy.io/usage/models))
     * NLTK ([StackOverflow](https://stackoverflow.com/questions/15111183/what-languages-are-supported-for-nltk-word-tokenize-and-nltk-pos-tag))
 * Add embeddings to nn.Embedding ([Medium](https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76) OR [StackOverflow](https://stackoverflow.com/questions/49710537/pytorch-gensim-how-do-i-load-pre-trained-word-embeddings/49802495#49802495) OR [androidkt.com](https://androidkt.com/pre-train-word-embedding-in-pytorch/))
+
+
+      
 
 2/2/2023:
 * Word embeddings:
@@ -27,9 +64,12 @@ Next week:
         * -> [Tutorial](https://github.com/ymoslem/OpenNMT-Tutorial)
 * Metric: BLEU: [huggingFace](https://huggingface.co/spaces/evaluate-metric/bleu) OR [ymoslem/MT-Evaluation (Github)](https://github.com/ymoslem/MT-Evaluation/blob/main/BLEU/compute-bleu.py)
 
+
+
 2/1/2023:
 * [simple Seq2Seq w/ Attention (Pytorch)](https://github.com/graykode/nlp-tutorial)
 * Choosing languages: Romanic (French, Italian, Spanish, Portuguese, Romanian), Germanic (English, Dutch, German, Danish, Swedish) ([europarl group](https://www.statmt.org/europarl/))
+
 
 
 1/30/2023
