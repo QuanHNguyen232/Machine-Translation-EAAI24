@@ -29,7 +29,7 @@ df = pd.read_csv('test.txt')  # read
 ```
 
 * Data EDA:
-   * Length: Most sentences have length of < 128 words/sent ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
+   * Length: Most sentences have length of < 128 words/sent and >=5words/sent (for 3 pairs En-Fr, De-En, De-Fr w/ pkl files on Drive quan.nh) ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
       * Result:
 
       ![Eng sent length](en-sent-len.png)
