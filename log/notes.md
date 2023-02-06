@@ -11,6 +11,16 @@ Next week:
 * Try metrics systems
 ---
 
+2/7/2023:
+* Papers:
+   * Pre/Post padding: [Effects of padding on LSTMs and CNNs](https://arxiv.org/pdf/1903.07288.pdf)
+   * Triangulated NMT:
+      * [Ensemble Triangulation for Statistical Machine Translation](https://aclanthology.org/I13-1029.pdf) (**very similar: FR - EN**)
+      * [Machine Translation by Triangulation: Making Effective Use of Multi-Parallel Corpora](https://aclanthology.org/P07-1092.pdf)
+      * [Local lexical adaptation in Machine Translation through triangulation: SMT helping SMT](https://aclanthology.org/C10-1027.pdf)
+      * [Revisiting Pivot Language Approach for Machine Translation](https://aclanthology.org/P09-1018.pdf)
+
+
 2/6/2023:
 * Save dataset, etc. w/ Pickle:
 ```python
