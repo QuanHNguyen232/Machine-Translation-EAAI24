@@ -12,11 +12,29 @@ Next week:
 ---
 
 2/6/2023:
+* Save dataset, etc. w/ Pickle:
+```python
+with open('datafile.pkl', 'wb') as f:   # save data
+  pickle.dump(dataset['train'], f)
+with open('datafile.pkl', 'rb') as f:   # load data
+  data = pickle.load(f)
+```
+
+* Update train_log:
+```python
+with open("test.txt", "a") as f: # save
+   f.write("string,50,0.01,0.02")
+   f.write("\n")
+df = pd.read_csv('test.txt')  # read
+```
+
 * Data EDA:
-   * Length: Most sentences have length of < 128 words/sent ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer) ----> reduce computational cost:
+   * Length: Most sentences have length of < 128 words/sent ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
       * Result:
+
       ![Eng sent length](en-sent-len.png)
       ![Fre sent length](fr-sent-len.png)
+      
       * Code:
 ```python
 max_len_en = defaultdict(int)
