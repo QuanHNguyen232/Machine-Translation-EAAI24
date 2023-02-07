@@ -1,3 +1,5 @@
+# Notes
+
 Most prefer:
 * Pretrained Model: mbart - hugging face ([link]())
 * Data: EuroParl - hugging face ([link](https://huggingface.co/datasets/europarl_bilingual))
@@ -11,18 +13,36 @@ Next week:
 * Try metrics systems
 ---
 
-2/7/2023:
+<details>
+  <summary>2/7/2023:</summary>
+
 * Papers:
+
    * Pre/Post padding: [Effects of padding on LSTMs and CNNs](https://arxiv.org/pdf/1903.07288.pdf)
    * Triangulated NMT:
       * [Ensemble Triangulation for Statistical Machine Translation](https://aclanthology.org/I13-1029.pdf) (**very similar: FR - EN**)
       * [Machine Translation by Triangulation: Making Effective Use of Multi-Parallel Corpora](https://aclanthology.org/P07-1092.pdf)
       * [Local lexical adaptation in Machine Translation through triangulation: SMT helping SMT](https://aclanthology.org/C10-1027.pdf)
       * [Revisiting Pivot Language Approach for Machine Translation](https://aclanthology.org/P09-1018.pdf)
+    * From mail:
+        * [Joint Training for Pivot-based Neural Machine Translation](https://www.ijcai.org/proceedings/2017/0555.pdf) --> how to joint 2 models
+        * [Pivot-based Transfer Learning for Neural Machine Translation between Non-English Languages](https://arxiv.org/pdf/1909.09524.pdf)
+        * [On the Importance of Pivot Language Selection for Statistical Machine Translation](https://aclanthology.org/N09-2056.pdf )
+        * [Pivot Based Language Modeling for Improved Neural Domain Adaptation](https://aclanthology.org/N18-1112.pdf)
+        * [Pivot Language Approach for Phrase-Based Statistical Machine Translation](https://www.jstor.org/stable/pdf/30219554.pdf)
+    * Another approach:
+        * Statistical machine translation
+        * Neural machine translation
 
 
-2/6/2023:
-* Save dataset, etc. w/ Pickle:
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
+
+
+<details>
+  <summary>2/6/2023:</summary>
+  Save dataset, etc. w/ Pickle:
+
 ```python
 with open('datafile.pkl', 'wb') as f:   # save data
   pickle.dump(dataset['train'], f)
@@ -39,40 +59,44 @@ df = pd.read_csv('test.txt')  # read
 ```
 
 * Data EDA:
-   * Length: Most sentences have length of < 128 words/sent and >=5words/sent (for 3 pairs En-Fr, De-En, De-Fr w/ pkl files on Drive quan.nh) ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
-      * Result:
 
-      ![Eng sent length](en-sent-len.png)
-      ![Fre sent length](fr-sent-len.png)
-      
-      * Code:
-```python
-max_len_en = defaultdict(int)
-max_len_fr = defaultdict(int)
-for i, pair in enumerate(dataset['train']):
-  pair = pair['translation']
+    * Length: Most sentences have length of < 128 words/sent and >=5words/sent (for 3 pairs En-Fr, De-En, De-Fr w/ pkl files on Drive quan.nh) ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
+        * Result:
 
-  sent_en = pair['en']
-  sent_en = sent_en.split(' ')
-  max_len_en[len(sent_en)] += 1
+        ![Eng sent length](en-sent-len.png)
+        ![Fre sent length](fr-sent-len.png)
+        
+        * Code:
+    ```python
+    max_len_en = defaultdict(int)
+    max_len_fr = defaultdict(int)
+    for i, pair in enumerate(dataset['train']):
+    pair = pair['translation']
 
-  sent_fr = pair['fr']
-  sent_fr = sent_fr.split(' ')
-  max_len_fr[len(sent_fr)] += 1
-  
-sort_en = sorted(max_len_en.items(), key=lambda x:x[0])
-sort_fr = sorted(max_len_fr.items(), key=lambda x:x[0])
-sort_en_key = [key for key, val in sort_en]
-sort_en_val = [val for key, val in sort_en]
-sort_fr_key = [key for key, val in sort_fr]
-sort_fr_val = [val for key, val in sort_fr]
+    sent_en = pair['en']
+    sent_en = sent_en.split(' ')
+    max_len_en[len(sent_en)] += 1
 
-plt.plot(sort_en_key, sort_en_val)
-plt.plot(sort_fr_key, sort_fr_val)
-```
+    sent_fr = pair['fr']
+    sent_fr = sent_fr.split(' ')
+    max_len_fr[len(sent_fr)] += 1
+    
+    sort_en = sorted(max_len_en.items(), key=lambda x:x[0])
+    sort_fr = sorted(max_len_fr.items(), key=lambda x:x[0])
+    sort_en_key = [key for key, val in sort_en]
+    sort_en_val = [val for key, val in sort_en]
+    sort_fr_key = [key for key, val in sort_fr]
+    sort_fr_val = [val for key, val in sort_fr]
 
+    plt.plot(sort_en_key, sort_en_val)
+    plt.plot(sort_fr_key, sort_fr_val)
+    ```
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
 
-2/5/2023:
+<details>
+  <summary>2/5/2023:</summary>
+
 * Tutorial:
     * [Pytorch Seq2Seq Tutorial for Machine Translation](https://www.youtube.com/watch?v=EoGUlvhRYpk) ---> [Pytorch Seq2Seq with Attention for Machine Translation](https://www.youtube.com/watch?v=sQUqQddQtB4)
 * Tokenizer:
@@ -80,10 +104,13 @@ plt.plot(sort_fr_key, sort_fr_val)
     * NLTK ([StackOverflow](https://stackoverflow.com/questions/15111183/what-languages-are-supported-for-nltk-word-tokenize-and-nltk-pos-tag))
 * Add embeddings to nn.Embedding ([Medium](https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76) OR [StackOverflow](https://stackoverflow.com/questions/49710537/pytorch-gensim-how-do-i-load-pre-trained-word-embeddings/49802495#49802495) OR [androidkt.com](https://androidkt.com/pre-train-word-embedding-in-pytorch/))
 
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
 
-      
 
-2/2/2023:
+<details>
+  <summary>2/2/2023:</summary>
+
 * Word embeddings:
     * [fasttext: multi-lingual word vectors](https://fasttext.cc/docs/en/crawl-vectors.html) or [Github](https://github.com/facebookresearch/fastText/tree/master)
     * [Fb MUSE: Multilingual Unsupervised and Supervised Embeddings](https://github.com/facebookresearch/MUSE#multilingual-word-embeddings)
@@ -92,15 +119,26 @@ plt.plot(sort_fr_key, sort_fr_val)
         * -> [Tutorial](https://github.com/ymoslem/OpenNMT-Tutorial)
 * Metric: BLEU: [huggingFace](https://huggingface.co/spaces/evaluate-metric/bleu) OR [ymoslem/MT-Evaluation (Github)](https://github.com/ymoslem/MT-Evaluation/blob/main/BLEU/compute-bleu.py)
 
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
 
+      
 
-2/1/2023:
+<details>
+  <summary>2/1/2023:</summary>
+
 * [simple Seq2Seq w/ Attention (Pytorch)](https://github.com/graykode/nlp-tutorial)
 * Choosing languages: Romanic (French, Italian, Spanish, Portuguese, Romanian), Germanic (English, Dutch, German, Danish, Swedish) ([europarl group](https://www.statmt.org/europarl/))
 
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
 
 
-1/30/2023
+
+
+<details>
+  <summary>1/30/2023:</summary>
+
 * Dataset: https://huggingface.co/datasets/europarl_bilingual (21 languages) - only has train set, download directly from [Europarl](https://www.statmt.org/europarl/) otherwise. Command:
 ```python
 !pip install datasets
@@ -121,3 +159,8 @@ dataset = load_dataset("europarl_bilingual", lang1="en", lang2="fr")  # https://
         * [TowardsDatScience: how to build an encoder decoder translation model using lstm with python and keras](https://towardsdatascience.com/how-to-build-an-encoder-decoder-translation-model-using-lstm-with-python-and-keras-a31e9d864b9b)
         * Base on this: [Github likarajo/language_translation](https://github.com/likarajo/language_translation)
         * Base on this: [Language Translator (RNN BiDirectional LSTMs and Attention) in Python](https://www.codespeedy.com/language-translator-rnn-bidirectional-lstms-and-attention-in-python/)
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
