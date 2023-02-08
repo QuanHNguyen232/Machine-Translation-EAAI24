@@ -11,4 +11,6 @@ sys.path.append('../')
 from dataset import dataloader
 from utils import util
 
-print(util.load_trainlog())
+# print(util.load_trainlog())
+data = util.load_data('./data/en-fr.pkl')
+print(data[3])

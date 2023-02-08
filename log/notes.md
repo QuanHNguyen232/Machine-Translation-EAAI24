@@ -1,6 +1,8 @@
 # Notes
 
 Most prefer:
+* Pretrained Embeddings: fasttext
+* Model: Seq2Seq w/ Attention
 * Pretrained Model: mbart - hugging face ([link]())
 * Data: EuroParl - hugging face ([link](https://huggingface.co/datasets/europarl_bilingual))
 * Metrics: BLEU ([huggingFace](https://huggingface.co/spaces/evaluate-metric/bleu) or [personal code](https://github.com/ymoslem/MT-Evaluation/blob/main/BLEU/compute-bleu.py))
@@ -59,56 +61,20 @@ TO DO:
 
 <details>
   <summary>2/6/2023:</summary>
-  Save dataset, etc. w/ Pickle:
 
-```python
-with open('datafile.pkl', 'wb') as f:   # save data
-  pickle.dump(dataset['train'], f)
-with open('datafile.pkl', 'rb') as f:   # load data
-  data = pickle.load(f)
-```
+* Save dataset, etc. w/ Pickle: check [data-note.md](../data/data-note.md)
 
-* Update train_log:
-```python
-with open("test.txt", "a") as f: # save
-   f.write("string,50,0.01,0.02")
-   f.write("\n")
-df = pd.read_csv('test.txt')  # read
-```
+* Update train_log: added to `utiles/util.py`
 
 * Data EDA:
-
     * Length: Most sentences have length of < 128 words/sent and >=5words/sent (for 3 pairs En-Fr, De-En, De-Fr w/ pkl files on Drive quan.nh) ----> only use sentences has less than 128 words (128 can be changed based on result of Tokenizer - it can be 100, then pad to 128) ----> reduce computational cost:
         * Result:
 
         ![Eng sent length](en-sent-len.png)
         ![Fre sent length](fr-sent-len.png)
         
-        * Code:
-    ```python
-    max_len_en = defaultdict(int)
-    max_len_fr = defaultdict(int)
-    for i, pair in enumerate(dataset['train']):
-    pair = pair['translation']
+        * Code: added to `utils/util.py`
 
-    sent_en = pair['en']
-    sent_en = sent_en.split(' ')
-    max_len_en[len(sent_en)] += 1
-
-    sent_fr = pair['fr']
-    sent_fr = sent_fr.split(' ')
-    max_len_fr[len(sent_fr)] += 1
-    
-    sort_en = sorted(max_len_en.items(), key=lambda x:x[0])
-    sort_fr = sorted(max_len_fr.items(), key=lambda x:x[0])
-    sort_en_key = [key for key, val in sort_en]
-    sort_en_val = [val for key, val in sort_en]
-    sort_fr_key = [key for key, val in sort_fr]
-    sort_fr_val = [val for key, val in sort_fr]
-
-    plt.plot(sort_en_key, sort_en_val)
-    plt.plot(sort_fr_key, sort_fr_val)
-    ```
 <p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
 
@@ -157,13 +123,8 @@ df = pd.read_csv('test.txt')  # read
 <details>
   <summary>1/30/2023:</summary>
 
-* Dataset: https://huggingface.co/datasets/europarl_bilingual (21 languages) - only has train set, download directly from [Europarl](https://www.statmt.org/europarl/) otherwise. Command:
-```python
-!pip install datasets
-from datasets import list_datasets, load_dataset
-print('europarl_bilingual' in list_datasets())
-dataset = load_dataset("europarl_bilingual", lang1="en", lang2="fr")  # https://huggingface.co/datasets/europarl_bilingual
-```
+* Dataset: https://huggingface.co/datasets/europarl_bilingual (21 languages) - only has train set, download directly from [Europarl](https://www.statmt.org/europarl/) otherwise. 
+
 * Models:
     * [mbart-large-cc25](https://huggingface.co/facebook/mbart-large-cc25) -> for low-resource languages (e.g. a few thousands to a few millions, up to 15m), using directly or fine-tuning mBART can give better results ([link](https://blog.machinetranslation.io/multilingual-nmt/))
     * [Helsinki-NLP](https://huggingface.co/Helsinki-NLP)
