@@ -1,7 +1,7 @@
 """
 @Creator: Quan Nguyen
-@Date: Feb 8, 2023
+@Date: Feb 7, 2023
 @Credits: Quan Nguyen
 
-dataloader file in dataset
+base.py file for models
 """

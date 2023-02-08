@@ -3,8 +3,5 @@
 @Date: Jan 28, 2023
 @Credits: Quan Nguyen
 
-File two
+__init__ file for models
 """
-
-def print_two():
-    print('file 2')

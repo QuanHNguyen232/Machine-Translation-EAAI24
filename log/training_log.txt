@@ -1,1 +1,2 @@
-model_name,epoch,train_loss,valid_loss
+model_name,lr,batch_size,hidden_size,num_layers,enc_dropout,dec_dropout,epoch,total_epoch,train_loss,valid_loss
+name,float,int,int,int,float,float,int,int,float,float

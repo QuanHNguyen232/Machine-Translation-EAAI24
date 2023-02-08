@@ -1,4 +1,0 @@
-model_name,epoch,train_loss,valid_loss
-x,1,2,3
-a,1,2,3
-string,50,0.01,0.02
