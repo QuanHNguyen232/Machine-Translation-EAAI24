@@ -13,8 +13,26 @@ Next week:
 * Try metrics systems
 ---
 
+TO DO:
+* [ ] Add Attention
+* [ ] Load pretrained word embedding
+* [ ] Use pretrained Tokenizer (Spacy)
+* [ ] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [document](https://pytorch.org/docs/stable/nn.init.html_))
+---
+
 <details>
   <summary>2/7/2023:</summary>
+
+* Modify model (tested on en-fra), visit [My_work_2.ipynb](../My_work_2.ipynb):
+  * seq_len=128
+  * reverse input seq
+  * Best: loss = 2.0569 after 20 epochs on eng-fra.txt (10m30s/ep)
+* Dataset:
+  * Redo as dict instead of huggingface's dataset type
+</details>
+
+<details>
+  <summary>2/6/2023 (p.2):</summary>
 
 * Papers:
 
