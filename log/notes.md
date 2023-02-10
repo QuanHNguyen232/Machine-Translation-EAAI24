@@ -23,6 +23,44 @@ TO DO:
 ---
 
 <details>
+<summary>Papers:</summary>
+
+* Papers:
+  * [Sequence to Sequence Learning with Neural Networks](https://proceedings.neurips.cc/paper/2014/file/a14ac55a4f27472c5d894ec1c3c743d2-Paper.pdf)
+  * [First Steps towards Multi-Engine Machine Translation](https://aclanthology.org/W05-0828.pdf)
+  * [Improving Cross Language Retrieval with Triangulated Translation](http://ccc.inaoep.mx/~villasen/bib/SIGIR2001.pdf)
+  * [COMPUTING CONSENSUS TRANSLATION FROM MULTIPLE MACHINE TRANSLATION SYSTEMS](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=c711516db4ef2e9c86234f3dc9d2bff11b3d96f6)
+  * [A Comparison of Pivot Methods for Phrase-based Statistical Machine](https://aclanthology.org/N07-1061.pdf)
+  * [Enhancing scarce-resource language translation through pivot combinations](https://aclanthology.org/I11-1154.pdf)
+
+
+  * Pre/Post padding: [Effects of padding on LSTMs and CNNs](https://arxiv.org/pdf/1903.07288.pdf)
+  * Triangulated NMT:
+    * [Ensemble Triangulation for Statistical Machine Translation](https://aclanthology.org/I13-1029.pdf) (**very similar: FR - EN**)
+    * [Machine Translation by Triangulation: Making Effective Use of Multi-Parallel Corpora](https://aclanthology.org/P07-1092.pdf)
+    * [Local lexical adaptation in Machine Translation through triangulation: SMT helping SMT](https://aclanthology.org/C10-1027.pdf)
+    * [Revisiting Pivot Language Approach for Machine Translation](https://aclanthology.org/P09-1018.pdf)
+  * From mail:
+      * [Joint Training for Pivot-based Neural Machine Translation](https://www.ijcai.org/proceedings/2017/0555.pdf) --> how to joint 2 models
+      * [Pivot-based Transfer Learning for Neural Machine Translation between Non-English Languages](https://arxiv.org/pdf/1909.09524.pdf)
+      * [On the Importance of Pivot Language Selection for Statistical Machine Translation](https://aclanthology.org/N09-2056.pdf )
+      * [Pivot Based Language Modeling for Improved Neural Domain Adaptation](https://aclanthology.org/N18-1112.pdf)
+      * [Pivot Language Approach for Phrase-Based Statistical Machine Translation](https://www.jstor.org/stable/pdf/30219554.pdf)
+  * Another approach:
+      * Statistical machine translation
+      * Neural machine translation
+
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
+
+</details>
+
+<details>
+  <summary>2/9/2023:</summary>
+* Train on smaller part of dataset --> go larger later
+</details>
+
+<details>
   <summary>2/7/2023:</summary>
 
 * Modify model (tested on en-fra), visit [My_work_2.ipynb](../My_work_2.ipynb):
@@ -31,29 +69,6 @@ TO DO:
   * Best: loss = 2.0569 after 20 epochs on eng-fra.txt (10m30s/ep)
 * Dataset:
   * Redo as dict instead of huggingface's dataset type
-</details>
-
-<details>
-  <summary>2/6/2023 (p.2):</summary>
-
-* Papers:
-
-   * Pre/Post padding: [Effects of padding on LSTMs and CNNs](https://arxiv.org/pdf/1903.07288.pdf)
-   * Triangulated NMT:
-      * [Ensemble Triangulation for Statistical Machine Translation](https://aclanthology.org/I13-1029.pdf) (**very similar: FR - EN**)
-      * [Machine Translation by Triangulation: Making Effective Use of Multi-Parallel Corpora](https://aclanthology.org/P07-1092.pdf)
-      * [Local lexical adaptation in Machine Translation through triangulation: SMT helping SMT](https://aclanthology.org/C10-1027.pdf)
-      * [Revisiting Pivot Language Approach for Machine Translation](https://aclanthology.org/P09-1018.pdf)
-    * From mail:
-        * [Joint Training for Pivot-based Neural Machine Translation](https://www.ijcai.org/proceedings/2017/0555.pdf) --> how to joint 2 models
-        * [Pivot-based Transfer Learning for Neural Machine Translation between Non-English Languages](https://arxiv.org/pdf/1909.09524.pdf)
-        * [On the Importance of Pivot Language Selection for Statistical Machine Translation](https://aclanthology.org/N09-2056.pdf )
-        * [Pivot Based Language Modeling for Improved Neural Domain Adaptation](https://aclanthology.org/N18-1112.pdf)
-        * [Pivot Language Approach for Phrase-Based Statistical Machine Translation](https://www.jstor.org/stable/pdf/30219554.pdf)
-    * Another approach:
-        * Statistical machine translation
-        * Neural machine translation
-
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
