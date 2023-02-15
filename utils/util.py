@@ -20,7 +20,7 @@ def calc_BLEU():
     pass
 
 def load_cfg(filename: str='./config/configuration.json'):
-    '''
+    ''' Load configuration
     Args:
         filename (String): path + file_name of config file as json
     Return:
@@ -33,7 +33,7 @@ def load_cfg(filename: str='./config/configuration.json'):
         return cfg
 
 def update_trainlog(data: List[Tuple], filename: str='./log/training_log.txt'):
-    '''
+    ''' Update training log w/ new losses
     Args:
         data (List): a list of infor for many epochs as tuple, each tuple has model_name, loss, etc.
         filename (String): path + file_name
@@ -47,7 +47,7 @@ def update_trainlog(data: List[Tuple], filename: str='./log/training_log.txt'):
     print('update_trainlog SUCCESS')
 
 def load_trainlog(filename: str='./log/training_log.txt'):
-    '''
+    ''' Load training log as pandas dataframe
     Args:
         filename (String): path + file_name
     Return:
@@ -57,7 +57,7 @@ def load_trainlog(filename: str='./log/training_log.txt'):
     return pd.read_csv(filename)
 
 def save_data(filename: str, dataset: List[Dict]):
-    '''
+    ''' Save data into Pickle file
     Args:
         dataset: list of pairs. Each pair of language is a Dict.
         filename (String): path + file_name
@@ -69,9 +69,9 @@ def save_data(filename: str, dataset: List[Dict]):
     print('save_data SUCCESS')
 
 def load_data(filename: str):
-    '''
+    ''' Load data from Pickle file
     Args:
-        filename (String): path + file_name
+        filename: path + file_name
     Return:
         dataset: list of pairs. Each pair of language is a Dict.
     '''

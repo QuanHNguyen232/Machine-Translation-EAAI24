@@ -26,6 +26,8 @@ TO DO:
 <summary>Papers:</summary>
 
 * Papers:
+  * [A Comparison of Pivot Methods for Phrase-based Statistical Machine Translation](https://aclanthology.org/N07-1061.pdf) (new)
+    * Direct > Phrase-based > Sentence-based
   * [Sequence to Sequence Learning with Neural Networks](https://proceedings.neurips.cc/paper/2014/file/a14ac55a4f27472c5d894ec1c3c743d2-Paper.pdf)
   * [First Steps towards Multi-Engine Machine Translation](https://aclanthology.org/W05-0828.pdf)
   * [Improving Cross Language Retrieval with Triangulated Translation](http://ccc.inaoep.mx/~villasen/bib/SIGIR2001.pdf)
@@ -53,6 +55,27 @@ TO DO:
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
 
+</details>
+
+<details>
+<summary>2/12/2023</summary>
+
+* <details>
+  <summary>Reverse result by dim</summary>
+
+    ```python
+      // create torch tensor
+      batch_size = 2
+      num_layer = 2
+      seq_len = 5
+      x = torch.rand(batch_size, num_layer, seq_len).type(torch.float32)
+      
+      // flip (reverse) by dim
+      x_2 = np.flip(x.detach().numpy(), axis=2)
+    ```
+</details>
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
 
 <details>
