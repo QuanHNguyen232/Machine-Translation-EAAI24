@@ -1,4 +1,25 @@
 {
-    "data_1": 2,
-    "data_2": 3
-}
+    "PAD_token": 0,
+    "SOS_token": 1,
+    "EOS_token": 2,
+    "MIN_LENGTH": 2,
+    "MAX_LENGTH": 50,
+    "max_seq_len": 64,
+    "input_pad": "post",
+    "input_reverse": true,
+    "spacy": {
+        "en": "en_core_web_sm",
+        "fr": "fr_core_news_sm",
+        "de": "de_core_news_sm"
+    },
+    "batch_size": 32,
+    "epoch": 5,
+    "dataset_len": 3200,
+    "encoder_embedding_size": 300,
+    "decoder_embedding_size": 300,
+    "hidden_size": 256,
+    "num_layers": 1,
+    "enc_dropout": 0.5,
+    "dec_dropout": 0.5,
+    "learning_rate": 0.001
+  }

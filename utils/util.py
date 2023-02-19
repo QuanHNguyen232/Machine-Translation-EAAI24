@@ -5,7 +5,7 @@
 
 util.py file for utils
 """
-
+import io
 import os
 import json
 import pickle
@@ -15,9 +15,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 import torch
-
-def calc_BLEU():
-    pass
+import torch.nn as nn
 
 def load_cfg(filename: str='./config/configuration.json'):
     ''' Load configuration
@@ -28,11 +26,10 @@ def load_cfg(filename: str='./config/configuration.json'):
     '''
     with open(filename, 'r') as jsonfile:
         cfg = json.load(jsonfile)
-        cfg['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('load_cfg SUCCESS')
         return cfg
 
-def update_trainlog(data: List[Tuple], filename: str='./log/training_log.txt'):
+def update_trainlog(data: list, filename: str='./log/training_log.txt'):
     ''' Update training log w/ new losses
     Args:
         data (List): a list of infor for many epochs as tuple, each tuple has model_name, loss, etc.
@@ -45,6 +42,16 @@ def update_trainlog(data: List[Tuple], filename: str='./log/training_log.txt'):
             f.write(','.join(epoch))
             f.write("\n")
     print('update_trainlog SUCCESS')
+    return []
+
+def save_model(model: nn.Module, filename: str):
+    torch.save(model.state_dict(), filename)
+    print('SAVED MODEL')
+
+def load_model(model: nn.Module, filename: str):
+    model.load_state_dict(torch.load(filename))
+    print('LOADED MODEL')
+    return model
 
 def load_trainlog(filename: str='./log/training_log.txt'):
     ''' Load training log as pandas dataframe
@@ -56,7 +63,7 @@ def load_trainlog(filename: str='./log/training_log.txt'):
     print('load_trainlog SUCCESS')
     return pd.read_csv(filename)
 
-def save_data(filename: str, dataset: List[Dict]):
+def save_data(filename: str, dataset: list):
     ''' Save data into Pickle file
     Args:
         dataset: list of pairs. Each pair of language is a Dict.
@@ -76,11 +83,47 @@ def load_data(filename: str):
         dataset: list of pairs. Each pair of language is a Dict.
     '''
     with open(filename, 'rb') as f:
-        dataset = pickle.load(f)
+        data = pickle.load(f)
         print('load_data SUCCESS')
-        return dataset
+        return data
 
-def seq_len_EDA(dataset: List[Dict]):
+def savePickle(input_lang, output_lang, pairs):
+  with open(f'./data/lang-{input_lang.name}.pkl', 'wb') as f:
+    pickle.dump(input_lang, f)
+  with open(f'./data/lang-{output_lang.name}.pkl', 'wb') as f:
+    pickle.dump(output_lang, f)
+  with open(f'./data/pairs-{input_lang.name}-{output_lang.name}.pkl', 'wb') as f:
+    pickle.dump(pairs, f)
+
+def loadPickle():
+  with open('./data/lang-en.pkl', 'rb') as f:
+    input_lang = pickle.load(f)
+  with open('./data/lang-fr.pkl', 'rb') as f:
+    output_lang = pickle.load(f)
+  with open('./data/pairs-en-fr.pkl', 'rb') as f:
+    pairs = pickle.load(f)
+  return input_lang, output_lang, pairs
+
+def init_weights(m):
+    for name, param in m.named_parameters():
+        if 'weight' in name:
+            nn.init.normal_(param.data, mean=0, std=0.01)
+        else:
+            nn.init.constant_(param.data, 0)
+
+def calc_BLEU():
+    pass
+
+def load_vectors(fname):
+    fin = io.open(fname, 'r', encoding='utf-8', newline='\n', errors='ignore')
+    n, d = map(int, fin.readline().split())
+    data = {}
+    for line in fin:
+        tokens = line.rstrip().split(' ')
+        data[tokens[0]] = list(map(float, tokens[1:]))
+    return data
+
+def seq_len_EDA(dataset: list):
     '''
     Args:
         dataset: list of pairs. Each pair of language is a Dict.

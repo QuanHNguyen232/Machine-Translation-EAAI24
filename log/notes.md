@@ -9,6 +9,12 @@ Most prefer:
 
 ---
 Next week:
+* Complete training pipeline
+* Filtering out suitable sentences (base on word frequency. e.g. most 150k popular words -> only use sentences with those words) (2 <= sent_len < 50)
+* Train direct translation (EN -> FR)
+* Train translation (EN -> DE -> FR) based on Joint Training for Pivot-based Neural Machine Translation (use their training objective as loss function) (if possible) (expect to be time consuming since using 2 Seq2Seq models)
+
+Last week:
 * Try merging systems + continuous system
     * first try direct translate + metric (based level) (focus more on basic **translating machine**)
     * how to make merging system feasible (critical problem that must be solved)
@@ -16,9 +22,9 @@ Next week:
 ---
 
 TO DO:
-* [ ] Add Attention
+* [X] Add Attention
 * [ ] Load pretrained word embedding
-* [ ] Use pretrained Tokenizer (Spacy)
+* [ ] Use pretrained Tokenizer (Spacy) (in dataloader)
 * [ ] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [document](https://pytorch.org/docs/stable/nn.init.html_))
 ---
 
@@ -28,6 +34,7 @@ TO DO:
 * Papers:
   * [A Comparison of Pivot Methods for Phrase-based Statistical Machine Translation](https://aclanthology.org/N07-1061.pdf) (new)
     * Direct > Phrase-based > Sentence-based
+  * [A Teacher-Student Framework for Zero-Resource Neural Machine Translation](https://arxiv.org/pdf/1705.00753.pdf) ([Github](https://github.com/dotaofll/Teacher-Student)) (new)
   * [Sequence to Sequence Learning with Neural Networks](https://proceedings.neurips.cc/paper/2014/file/a14ac55a4f27472c5d894ec1c3c743d2-Paper.pdf)
   * [First Steps towards Multi-Engine Machine Translation](https://aclanthology.org/W05-0828.pdf)
   * [Improving Cross Language Retrieval with Triangulated Translation](http://ccc.inaoep.mx/~villasen/bib/SIGIR2001.pdf)
@@ -73,7 +80,7 @@ TO DO:
       // flip (reverse) by dim
       x_2 = np.flip(x.detach().numpy(), axis=2)
     ```
-</details>
+  </details>
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
@@ -81,6 +88,8 @@ TO DO:
 <details>
   <summary>2/9/2023:</summary>
 * Train on smaller part of dataset --> go larger later
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
 
 <details>

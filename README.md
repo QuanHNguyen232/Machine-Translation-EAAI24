@@ -3,13 +3,11 @@
 TO DO:
 * [ ] ERROR in Seq2Seq model, but why it stil can run??? ([`models/base.py`](models/base.py))
 * [ ] Apply beam search [pcyin Github](https://github.com/pcyin/pytorch_basic_nmt)
-* [X] Padding base on [likarajo Github](https://github.com/likarajo/language_translation)
 * [ ] Use pretrained word embedding [likarajo Github](https://github.com/likarajo/language_translation)
-* [ ] Add Attention into model (next [tutorial](https://www.youtube.com/watch?v=sQUqQddQtB4))
-* [ ] Use pretrained Tokenizer (Spacy)
+
 
 * Original paper [Seq2Seq](https://arxiv.org/pdf/1409.3215.pdf):
-    * [ ] Use 4 layers of LSTM
+    <!-- * [ ] Use 4 layers of LSTM -->
     * [X] Reversing the Source Sentences () --> output should be like this:
         ```python
         PAD_token = 0
