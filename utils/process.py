@@ -130,6 +130,3 @@ def prepareData(cfg, in_lang: str='en', out_lang: str='fr', datafile: str='./dat
     print(output_lang.name, output_lang.n_words)
 
     return (input_lang, output_lang, pairs)
-
-if __name__ == '__main__':
-    print('hello')

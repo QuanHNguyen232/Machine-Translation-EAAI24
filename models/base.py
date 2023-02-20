@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 
 class Encoder(nn.Module):
-  def __init__(self, input_size, embedding_size, hidden_size, num_layers, p):
+  def __init__(self, input_size, cfg: dict): # embedding_size, hidden_size, num_layers, p
     '''
     Args:
       input_size: size of Vocabulary (input_lang)
@@ -24,36 +24,39 @@ class Encoder(nn.Module):
       p: dropout rate = 0.5
     '''
     super(Encoder, self).__init__()
-    self.dropout = nn.Dropout(p)
-    self.hidden_size = hidden_size
-    self.num_layers = num_layers
+    self.cfg = cfg
+    self.input_size = input_size
+    self.embedding_size = cfg.get('encoder_embedding_size', 300)
+    self.p = cfg.get('enc_dropout', 0.5)
+    self.hidden_size = cfg.get('hidden_size', 256)
+    self.num_layers = cfg.get('num_layers', 2)
 
-    self.embedding = nn.Embedding(input_size, embedding_size) # output can be (batch, sent_len, embedding_size)
-    self.rnn = nn.LSTM(embedding_size, hidden_size, num_layers, dropout=p)
+    self.dropout = nn.Dropout(self.p)
+
+    self.embedding = nn.Embedding(self.input_size, self.embedding_size, padding_idx=cfg.get('PAD_token', 0)) # output can be (batch, sent_len, embedding_size)
+    self.rnn = nn.LSTM(self.embedding_size, self.hidden_size, self.num_layers, dropout=self.p)
   
   def forward(self, x):
     '''
     Args:
-      x: has shape = (seq_len, batch_size)
+      x: has shape = (seq_len, N)
 
     Return:
-      hidden: shape = (D∗num_layers, batch_size, hidden_size if proj_size<=0 else proj_size)
-      cell: shape = (D∗num_layers, bact_size, hidden_size)
+      hidden: shape = (D∗num_layers, N, hidden_size if proj_size<=0 else proj_size)
+      cell: shape = (D∗num_layers, N, hidden_size)
     '''
-    # print(f'Encoder\t x.shape = {x.shape} \t expect (512, batch_size)')
     embedding = self.dropout(self.embedding(x))
-    # print(f'Encoder\t embedding.shape = {embedding.shape} \t expect (512, batch_size, 300)')
-
     # embedding shape = (seq_len, batch_size, embedding_size)
+
     # LSTM input: shape = (seq_len, batch_size, input_size)
     outputs, (hidden, cell) = self.rnn(embedding) # outputs shape: (seq_length, N, hidden_size)
-    # print(f'Encoder\t hidden.shape = {hidden.shape} \t expect ({self.num_layers}, batch_size, {self.hidden_size})')
-    # print(f'Encoder\t cell.shape = {cell.shape} \t expect ({self.num_layers}, batch_size, {self.hidden_size})')
-
-    return hidden, cell # error in return shape (expect 2D)
+    # outputs.shape = [seq_len, batch N, hidden_size * num_directions]
+    # hidden.shape = (num_layers * num_directions, N, hidden_size)
+    # cell.shape = (num_layers * num_directions, N, hidden_size)
+    return hidden, cell
 
 class Decoder(nn.Module):
-  def __init__(self, input_size, embedding_size, hidden_size, output_size, num_layers, p):
+  def __init__(self, output_size, cfg: dict): # input_size, embedding_size, hidden_size, num_layers, p
     '''
     input_size: size of Vocabulary
     embedding_size: size of vec for word2vec
@@ -63,13 +66,17 @@ class Decoder(nn.Module):
     p: dropout rate
     '''
     super(Decoder, self).__init__()
-    self.hidden_size = hidden_size
-    self.num_layers = num_layers
+    self.cfg = cfg
+    self.output_size = output_size
+    self.hidden_size = cfg.get('hidden_size', 256)
+    self.num_layers = cfg.get('num_layers', 2)
+    self.p = cfg.get('dec_dropout', 0.5)
+    self.embedding_size = cfg.get('decoder_embedding_size', 300)
 
-    self.dropout = nn.Dropout(p)
-    self.embedding = nn.Embedding(input_size, embedding_size)
-    self.rnn = nn.LSTM(embedding_size, hidden_size, num_layers, dropout=p)
-    self.fc = nn.Linear(hidden_size, output_size)
+    self.dropout = nn.Dropout(self.p)
+    self.embedding = nn.Embedding(self.output_size, self.embedding_size, padding_idx=cfg.get('PAD_token', 0))
+    self.rnn = nn.LSTM(self.embedding_size, self.hidden_size, self.num_layers, dropout=self.p)
+    self.fc = nn.Linear(self.hidden_size, self.output_size)
 
   def forward(self, x, hidden, cell):
     '''
@@ -82,19 +89,17 @@ class Decoder(nn.Module):
       pred: shape = (batch_size, target_vocab_len)
       hidden, cell: state for next pred
     '''
-    # print(f'Decoder\tx.shape = {x.shape} \t expect (batch_size)')
-    x = x.unsqueeze(0)  # shape = (1, batch_size) = (seq_len, batch_size) since we use a single word and not a sentence
+    x = x.unsqueeze(0)  # shape = (1, N) = (seq_len, N) since we use a single word and not a sentence
     # print(f'Decoder\tx.shape = {x.shape} \t expect (1, batch_size)')
     
-    embedding = self.dropout(self.embedding(x)) # embedding shape = (1, batch_size, embedding_size)
-    # print(f'Decoder\t embedding.shape = {embedding.shape} \t expect (1, batch_size, 300)')
-    # print(f'Decoder\t hidden.shape = {hidden.shape} \t cell.shape = {cell.shape}')
+    embedding = self.dropout(self.embedding(x)) # embedding shape = (1, N, embedding_size)
+    
     outputs, (hidden, cell) = self.rnn(embedding, (hidden, cell)) # outputs shape = (1, batch_size, hidden_size)
-    # print(f'Decoder\t outputs.shape = {outputs.shape} \t expect (1, batch_size, {self.hidden_size})')
+    # output = [seq len, N, hidden_size * num_directions]
+    # hidden = [num_layers * num_directions, N, hidden_size]
+    # cell = [num_layers * num_directions, N, hidden_size]
 
-    predictions = self.fc(outputs)  # predictions.shape = (1, batch_size, vocab_len)
-    predictions = predictions.squeeze(0)  # predictions.shape = (batch_size, target_vocab_len) to send to loss func
-    # print(f'Decoder\t predictions.shape = {predictions.shape} \t expect (batch_size, target_vocab_len)')
+    predictions = self.fc(outputs.squeeze(0))  # predictions.shape = (N, vocab_len)
     return predictions, hidden, cell
 
 class Seq2Seq(nn.Module):
@@ -102,18 +107,22 @@ class Seq2Seq(nn.Module):
     super(Seq2Seq, self).__init__()
     self.encoder = encoder
     self.decoder = decoder
+    self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    assert encoder.hidden_size == decoder.hidden_size, "Hidden dimensions of encoder and decoder must be equal!"
+    assert encoder.num_layers == decoder.num_layers, "Encoder and decoder must have equal number of layers!"
 
   def forward(self, source, target, teacher_force_ratio=0.5):
     '''
-    source: shape = (src_len, batch_size)
-    target: shape = (target_len, batch_size)
+    source: shape = (src_len, N)
+    target: shape = (target_len, N)
     teacher_force_ratio: ratio b/w choosing predicted and ground_truth word to use as input for next word prediction
     '''
-    batch_size = source.shape[1]  # need modification
-    target_len = target.shape[0]  # need modification
-    target_vocab_size = output_lang.n_words  # need modification (len of target vocab)
+    batch_size = source.shape[1]
+    target_len = target.shape[0]
+    target_vocab_size = self.decoder.output_size
 
-    outputs = torch.zeros(target_len, batch_size, target_vocab_size).to(device) # use as output prediction, init w/ zeros
+    outputs = torch.zeros(target_len, batch_size, target_vocab_size).to(self.device) # use as output prediction, init w/ zeros
 
     hidden, cell = self.encoder(source)
 
@@ -131,15 +140,8 @@ class Seq2Seq(nn.Module):
       outputs[t] = output
 
       # Get the best word the Decoder predicted (index in the vocabulary)
-      best_guess = output.argmax(1) # best_guess.shape = (batch_size)
-      # print(f'Seq2Seq\t best_guess.shape = {best_guess.shape} \t expect (batch_size)')
+      best_guess = output.argmax(1) # best_guess.shape = (N)
 
-      # With probability of teacher_force_ratio we take the actual next word
-      # otherwise we take the word that the Decoder predicted it to be.
-      # Teacher Forcing is used so that the model gets used to seeing
-      # similar inputs at training and testing time, if teacher forcing is 1
-      # then inputs at test time might be completely different than what the
-      # network is used to. This was a long comment.
       x = target[t] if random.random() < teacher_force_ratio else best_guess
 
     return outputs

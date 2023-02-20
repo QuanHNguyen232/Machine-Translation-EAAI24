@@ -111,6 +111,10 @@ def init_weights(m):
         else:
             nn.init.constant_(param.data, 0)
 
+def init_weights_08(m):
+  for name, param in m.named_parameters():
+    nn.init.uniform_(param.data, -0.08, 0.08)
+
 def calc_BLEU():
     pass
 
