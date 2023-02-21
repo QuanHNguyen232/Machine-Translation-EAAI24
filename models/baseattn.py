@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 
 class Encoder_Attn(nn.Module):
-  def __init__(self, input_size, cfg):  # embedding_size, hidden_size, num_layers, p, 
+  def __init__(self, input_size, cfg: dict):  # embedding_size, hidden_size, num_layers, p, 
     '''
     Args:
       input_size: size of in_lang
@@ -26,10 +26,10 @@ class Encoder_Attn(nn.Module):
     super(Encoder_Attn, self).__init__()
     self.cfg = cfg
     self.input_size = input_size
-    self.embedding_size = cfg['encoder_embedding_size']
-    self.p = cfg['enc_dropout']
-    self.hidden_size = cfg['hidden_size']
-    self.num_layers = cfg['num_layers']
+    self.embedding_size = cfg.get('encoder_embedding_size', 300)
+    self.p = cfg.get('enc_dropout', 0.5)
+    self.hidden_size = cfg.get('hidden_size', 256)
+    self.num_layers = 1
 
     self.embedding = nn.Embedding(self.input_size, self.embedding_size, padding_idx=self.cfg['PAD_token']) # output can be (batch, sent_len, embedding_size)
     self.rnn = nn.LSTM(self.embedding_size, self.hidden_size, self.num_layers, bidirectional=True)
@@ -62,7 +62,7 @@ class Encoder_Attn(nn.Module):
     # --> correct https://github.com/bentrevett/pytorch-seq2seq/blob/master/4%20-%20Packed%20Padded%20Sequences%2C%20Masking%2C%20Inference%20and%20BLEU.ipynb
 
 class Decoder_Attn(nn.Module):
-  def __init__(self, output_size, cfg):  # embedding_size, hidden_size, output_size, num_layers, p | output_dim, emb_dim, hid_dim, n_layers, dropout
+  def __init__(self, output_size, cfg: dict):  # embedding_size, hidden_size, output_size, num_layers, p | output_dim, emb_dim, hid_dim, n_layers, dropout
     '''
     embedding_size: size of vec for word2vec
     hidden_size: same as in Encoder
@@ -72,14 +72,14 @@ class Decoder_Attn(nn.Module):
     '''
     super(Decoder_Attn, self).__init__()
     self.cfg = cfg
-    self.hidden_size = cfg['hidden_size']
-    self.num_layers = cfg['num_layers']
-    self.p = cfg['dec_dropout']
     self.output_size = output_size
-    self.embedding_size = cfg['decoder_embedding_size']
+    self.hidden_size = cfg.get('hidden_size', 256)
+    self.num_layers = 1   # num_layers = 1 is a must
+    self.p = cfg.get('dec_dropout', 0.5)
+    self.embedding_size = cfg.get('decoder_embedding_size', 300)
 
     self.embedding = nn.Embedding(self.output_size, self.embedding_size, padding_idx=self.cfg['PAD_token'])
-    self.rnn = nn.LSTM(self.hidden_size*2 + self.embedding_size, self.hidden_size, 1)  # num_layers = 1 is a must
+    self.rnn = nn.LSTM(self.hidden_size*2 + self.embedding_size, self.hidden_size, self.num_layers)
     self.energy = nn.Linear(self.hidden_size*3, 1) # hidden_states from encoder + prev step from decoder
     self.dropout = nn.Dropout(self.p)
     self.fc = nn.Linear(self.hidden_size, self.output_size)
@@ -145,8 +145,6 @@ class Seq2Seq_Attn(nn.Module):
     target: shape = (batch_size, target_len)
     teacher_force_ratio: ratio b/w choosing predicted and ground_truth word to use as input for next word prediction
     '''
-    source = source.permute(1, 0)
-    target = target.permute(1, 0)
 
     batch_size = target.shape[1]
     target_len = target.shape[0]

@@ -115,7 +115,7 @@ def prepareData(cfg, in_lang: str='en', out_lang: str='fr', datafile: str='./dat
         output_lang: Lang object of out_lang w/ attributes updated
         pairs: list of pairs of sentences (each pair is in_lang - out_lang)
     '''
-    input_lang, output_lang, pairs = readLangs(cfg, in_lang, out_lang)
+    input_lang, output_lang, pairs = readLangs(cfg, in_lang, out_lang, datafile)
     print("Read %s sentence pairs" % len(pairs))
     pairs = filterPairs(pairs)
     print("Trimmed to %s sentence pairs" % len(pairs))

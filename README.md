@@ -18,8 +18,11 @@ TO DO:
         ```
 
     * [X] Although LSTMs can have exploding gradients. Thus we enforced a hard constraint on the norm of the gradient [10,25] by scaling it when its norm exceeded a threshold.
-    * [ ] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [documen](https://pytorch.org/docs/stable/nn.init.html_))
-
+    * [X] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [documen](https://pytorch.org/docs/stable/nn.init.html_))
+    * [ ] Use pad_pack to reduce computation:
+        * https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
+        * https://discuss.pytorch.org/t/dataloader-for-various-length-of-data/6418/5
+        * https://gmihaila.medium.com/better-batches-with-pytorchtext-bucketiterator-12804a545e2a
 Best performance till now:
 ```python
 # padding = 'pre' in (reversed) and 'post' out

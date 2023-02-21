@@ -26,6 +26,7 @@ def load_cfg(filename: str='./config/configuration.json'):
     '''
     with open(filename, 'r') as jsonfile:
         cfg = json.load(jsonfile)
+        cfg['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('load_cfg SUCCESS')
         return cfg
 
