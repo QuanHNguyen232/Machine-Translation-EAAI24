@@ -73,6 +73,12 @@ TO DO:
    * [ ] Reverse input
    * [ ] Use batch=128 (need bigger gpu - colab pro subscription) for faster training time
    * [ ] Init model to similar to Seq2Seq paper: init LSTM’s parameters with the uniform distribution between $-0.08$ and $0.08$
+   * [ ] Choose pairs based on most freq words
+      * get $n$ most `freq_words`
+      * check each sent with each word if word in `most_freq_words corpus` (do for both src, trg lang)
+      * if condition satisfies (all words in both langs in `most_freq_words corpus`), add to `index_list`
+      * get `final_dataset` from `index_list`
+      * if `final_datset` is too small -> increase $n$
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
