@@ -1,9 +1,14 @@
 # Machine-Translation-EAAI24
 
-TO DO:
-* [ ] ERROR in Seq2Seq model, but why it stil can run??? ([`models/base.py`](models/base.py))
-* [ ] Apply beam search [pcyin Github](https://github.com/pcyin/pytorch_basic_nmt)
-* [ ] Use pretrained word embedding [likarajo Github](https://github.com/likarajo/language_translation)
+**NOTE**:
+* `attn_en-fr_32k_160kset_inverse.pt` achieves BLEU=32.15
+    * Dataset: 160kpairs-2k5-freq-words
+    * Inverse input (inverse then add `<sos>`, `<eos>`, and `<pad>` (post padding))
+    * Batch=32
+    * Epochs = 10
+    * train_len = 64000, test_len = 3200
+    * ENC_EMB_DIM = 256, DEC_EMB_DIM = 256, ENC_HID_DIM = 512, DEC_HID_DIM = 512, ENC_DROPOUT = 0.5, DEC_DROPOUT = 0.5, LR = 0.001
+    * init_weights: nn.init.normal_(param.data, mean=0, std=0.01)
 
 
 * Original paper [Seq2Seq](https://arxiv.org/pdf/1409.3215.pdf):
