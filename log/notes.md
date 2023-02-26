@@ -24,7 +24,7 @@ Last week:
 TO DO:
 * [X] Add Attention
 * [ ] Load pretrained word embedding
-* [ ] Use pretrained Tokenizer (Spacy) (in dataloader)
+* [X] Use pretrained Tokenizer (Spacy) (in dataloader)
 * [ ] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [document](https://pytorch.org/docs/stable/nn.init.html_))
 ---
 
@@ -62,6 +62,25 @@ TO DO:
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
 
+</details>
+
+<details>
+<summary>2/22/2023</summary>
+
+* Dataset: may use Tatoeba instead because it is much smaller (50k-300k pairs)
+* Model trained: `attn_en-fr_32k.pt` achieve $bleu=12.65$ on quan.nh and 32k europarl. Trained in `bentrevett/pytorch-seq2seq.ipynb` file. Check `training_log.txt` for further info.
+* Future:
+   * [ ] Reverse input
+   * [ ] Use batch=128 (need bigger gpu - colab pro subscription) for faster training time
+   * [ ] Init model to similar to Seq2Seq paper: init LSTM’s parameters with the uniform distribution between $-0.08$ and $0.08$
+   * [ ] Choose pairs based on most freq words
+      * get $n$ most `freq_words`
+      * check each sent with each word if word in `most_freq_words corpus` (do for both src, trg lang)
+      * if condition satisfies (all words in both langs in `most_freq_words corpus`), add to `index_list`
+      * get `final_dataset` from `index_list`
+      * if `final_datset` is too small -> increase $n$
+
+<p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
 
 <details>
