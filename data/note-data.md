@@ -1,3 +1,7 @@
+* USING datasets (generated from `Filtering dataset.ipynb`):
+  * en-fr: `enfr_160kpairs_2k5-freq-words`
+  * en-de-fr: `endefr_75kpairs_2k5-freq-words`
+
 How to get data from HuggingFace:
 
 * Install package

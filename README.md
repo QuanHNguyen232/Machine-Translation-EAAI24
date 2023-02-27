@@ -1,6 +1,8 @@
 # Machine-Translation-EAAI24
 
 **NOTE**:
+* Main pipeline: `bentrevett_pytorch_seq2seq.ipynb`
+* Pivot model EN-DE-FR: `piv_endefr_74kset.pt`
 * `attn_en-fr_32k_160kset_inverse.pt` achieves BLEU=32.15
     * Dataset: 160kpairs-2k5-freq-words
     * Inverse input (inverse then add `<sos>`, `<eos>`, and `<pad>` (post padding))
