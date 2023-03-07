@@ -22,9 +22,6 @@ Last week:
 ---
 
 TO DO:
-* [X] Add Attention
-* [ ] Load pretrained word embedding
-* [X] Use pretrained Tokenizer (Spacy) (in dataloader)
 * [ ] Initialized all of the LSTM’s parameters with the uniform distribution between -0.08 and 0.08 (check [stackoverflow](https://stackoverflow.com/questions/55276504/different-methods-for-initializing-embedding-layer-weights-in-pytorch) OR [document](https://pytorch.org/docs/stable/nn.init.html_))
 ---
 
@@ -61,7 +58,17 @@ TO DO:
 
 
 <p align="right"><a href="#notes">[Back to top]</a></p>
+</details>
 
+<details>
+  <summary>3/6/2023</summary>
+
+  NEW TASKS:
+  * [X] Seq2Seq: sort by src_len and unsort output --> ensure output matches with trg
+  * [ ] Pivot model: ensure it works for $n$ seq2seq models
+  * [ ] Trian model: ensure outputs from all submodels match
+  
+  <p align="right"><a href="#notes">[Back to top]</a></p>
 </details>
 
 <details>

@@ -1,5 +1,10 @@
 # Machine-Translation-EAAI24
 
+NEW TASKS:
+* [X] Seq2Seq: sort by src_len and unsort output --> ensure output matches with trg
+* [ ] Pivot model: ensure it works for $n$ seq2seq models
+* [ ] Trian model: ensure outputs from all submodels match w/ target sent
+
 ### Table of content
 1. Best models ([go-there](#best-models))
 1. Things in common ([go-there](#things-in-common))
