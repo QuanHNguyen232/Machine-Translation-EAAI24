@@ -117,3 +117,16 @@ NEW TASKS:
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     ```
     </details>
+
+
+
+<details>
+    <summary>Future work improvements for dataloader(after having results)</summary>
+
+* Replace Field, BucketIterator with those:
+    1. Use `build_vocab_from_iterator` ([example tutorial](https://pytorch.org/tutorials/beginner/text_sentiment_ngrams_tutorial.html))
+    2. [torchtext.vocab](https://pytorch.org/text/stable/vocab.html)
+    3. [torchtext tutorial general](https://pytorch.org/text/0.14.0/)
+* `EmbeddingBag` with `offsets` can replace `Embedding` and `sent_len` is OPTIONAL since using `pack_padded_sequence` also reduces padding.
+
+</details>
