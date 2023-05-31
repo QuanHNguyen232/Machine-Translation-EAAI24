@@ -1,100 +1,53 @@
 # Machine-Translation-EAAI24
 
+Discussion:
+* Pivot model has en-fr BLEU 33 (much lower than training separately) because we did not assign the correct weight for the loss (hypothesis). Thus we can try dynamic ensemble loss in the future
+
 NEW TASKS:
 * [X] Seq2Seq: sort by src_len and unsort output --> ensure output matches with trg
-* [ ] Pivot model: ensure it works for $n$ seq2seq models
+* [X] Pivot model: ensure it works for $n$ seq2seq models
 * [ ] Trian model: ensure outputs from all submodels match w/ target sent
 
 ### Table of content
+1. Config ([go-there](#config))
 1. Best models ([go-there](#best-models))
 1. Things in common ([go-there](#things-in-common))
 ---
 
+## Config
+
+* <details><summary>Vocab size</summary>
+
+    Build on first 64000 sentences of data `EnDeFrItEsPtRo-76k-most5k.pkl` with `min_freq=2`:
+    * en: 6964
+    * fr: 9703
+    * es: 10461
+    * it: 10712
+    * pt: 10721
+    * ro: 11989
+</details>
+
+* <details><summary>Model config</summary>
+
+    * Embed_Dim = 256
+    * Hidden_Dim = 512
+    * Dropout = 0.5
+</details>
+
 ## Best models:
-* Seq2Seq:
-    * en-fr: `attn_enfr_160kset.pt` (BLEU = 32.18)
-        <details>
-        <summary>Model detail</summary>
-
-        ```python
-        # Check node-data.md to get FIELD.vocab
-        INPUT_DIM = 2463    #len(SRC_FIELD.vocab)
-        OUTPUT_DIM = 2495   #len(TRG_FIELD.vocab)
-        ENC_EMB_DIM = 256
-        DEC_EMB_DIM = 256
-        ENC_HID_DIM = 512
-        DEC_HID_DIM = 512
-        ENC_DROPOUT = 0.5
-        DEC_DROPOUT = 0.5
-        LR = 0.001
-        SRC_PAD_IDX = SRC_FIELD.vocab.stoi[SRC_FIELD.pad_token]
-
-        attn = Attention(ENC_HID_DIM, DEC_HID_DIM)
-        enc = Encoder(INPUT_DIM, ENC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, ENC_DROPOUT)
-        dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, DEC_DROPOUT, attn)
-
-        model = Seq2Seq(enc, dec, SRC_PAD_IDX, device).to(device)
-        
-        optimizer = optim.Adam(model.parameters(), lr=LR)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.333)
-        ```
-        </details>
+* Seq2Seq: `seq2seq-EnFr-1.pt`
 * Pivot:
-    * en-de-fr: `piv_endefr_74kset_2.pt` (BLEU = 26.33)
-        <details>
-        <summary>Model detail</summary>
-
-        ```python
-        # Check node-data.md to get FIELD.vocab
-        INPUT_DIM = 2267    #len(SRC_FIELD.vocab)
-        PIV_DIM = 2474    #len(PIV_FIELD.vocab)
-        OUTPUT_DIM = 2390   #len(TRG_FIELD.vocab)
-        ENC_EMB_DIM = 256
-        DEC_EMB_DIM = 256
-        ENC_HID_DIM = 512
-        DEC_HID_DIM = 512
-        ENC_DROPOUT = 0.5
-        DEC_DROPOUT = 0.5
-        LR = 0.001
-
-        SRC_PAD_IDX = SRC_FIELD.vocab.stoi[SRC_FIELD.pad_token]
-        PIV_PAD_IDX = PIV_FIELD.vocab.stoi[PIV_FIELD.pad_token]
-
-        attn1 = Attention(ENC_HID_DIM, DEC_HID_DIM)
-        enc1 = Encoder(INPUT_DIM, ENC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, ENC_DROPOUT)
-        dec1 = Decoder(PIV_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, DEC_DROPOUT, attn1)
-        model1 = Seq2Seq(enc1, dec1, SRC_PAD_IDX, device).to(device)
-
-        attn2 = Attention(ENC_HID_DIM, DEC_HID_DIM)
-        enc2 = Encoder(PIV_DIM, ENC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, ENC_DROPOUT)
-        dec2 = Decoder(OUTPUT_DIM, DEC_EMB_DIM, ENC_HID_DIM, DEC_HID_DIM, DEC_DROPOUT, attn2)
-        model2 = Seq2Seq(enc2, dec2, PIV_PAD_IDX, device).to(device)
-
-        model = PivotSeq2Seq(model1, model2, SRC_FIELD, PIV_FIELD, TRG_FIELD, device).to(device)
-
-        optimizer = optim.Adam(model.parameters(), lr=LR)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.333)
-
-        criterion1 = nn.CrossEntropyLoss(ignore_index = PIV_FIELD.vocab.stoi[PIV_FIELD.pad_token])
-        criterion2 = nn.CrossEntropyLoss(ignore_index = TRG_FIELD.vocab.stoi[TRG_FIELD.pad_token])
-        criterions = (criterion1, criterion2)
-        ```
-        </details>
+    * es: `piv-EnEsFr.pt`
+    * it: `piv-EnItFr.pt`
+    * pt: `piv-EnPtFr.pt`
+    * ro: `piv-EnRoFr.pt`
+* Triang: (combination of trained Seq2Seq & Pivot)
 
 ## Things in common:
 * Main pipeline: `bentrevett_pytorch_seq2seq.ipynb`
-* Datasets:
-    * Seq2Seq:
-        * en-fr: `endefr_75kpairs_2k5-freq-words.pkl`
-    * Pivot:
-        * en-de-fr: `enfr_160kpairs_2k5-freq-words.pkl`
-* Data info:
-    * train_len, valid_len, test_len = 64000, 3200, 6400
-    * batch_size = 64
-
-* Init weights: all models use:
-    <details>
-    <summary>Code</summary>
+* Datasets: `EnDeFrItEsPtRo-76k-most5k.pkl`
+* Data info: train_len, valid_len, test_len = 64000, 3200, 6400
+* <details><summary>Init weights (all models)</summary>
 
     ```python
     def init_weights(m):
@@ -106,9 +59,8 @@ NEW TASKS:
     model.apply(init_weights);
     ```
     </details>
-* Load model weights:
-    <details>
-    <summary>Code</summary>
+
+* <details><summary>Load model weights</summary>
 
     ```python
     checkpoint = torch.load('path_to_model/model_name.pt')
@@ -117,6 +69,18 @@ NEW TASKS:
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     ```
     </details>
+
+* <details><summary>Learning rate</summary>
+
+    * Seq2Seq: start w/ $0.0012$, reduced by $\frac{2}{3}$ every epoch
+    * Pivot: start w/ $0.0012$, reduced by $\frac{2}{3}$ at epoch 3rd, 6th, 8th, 9th, 10th.
+</details>
+
+* <details><summary>Epoch</summary>
+
+    * Seq2Seq: 7
+    * Pivot: 11
+</details>
 
 
 
