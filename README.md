@@ -94,3 +94,11 @@ NEW TASKS:
 * `EmbeddingBag` with `offsets` can replace `Embedding` and `sent_len` is OPTIONAL since using `pack_padded_sequence` also reduces padding.
 
 </details>
+
+## Transformer
+* Implement based on "Attention is all you need"
+    * github most popular: [jadore801120/attention-is-all-you-need-pytorch](https://github.com/jadore801120/attention-is-all-you-need-pytorch/tree/master)
+    * kaggle implementation by [FERNANDES](https://www.kaggle.com/code/ricafernandes/attention-is-all-you-need-paper-implementation/notebook)
+    * another fine github repo [jayparks/transformer](https://github.com/jayparks/transformer/tree/master)
+    * a basic explanation of some concepts on [towardsdatascience](https://towardsdatascience.com/attention-is-all-you-need-discovering-the-transformer-paper-73e5ff5e0634)
+    * check VietAI code
