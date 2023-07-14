@@ -1,5 +1,12 @@
 # Machine-Translation-EAAI24
 
+*7/13/2023 new note:*
+* Training notebooks can be found in those emails:
+    * quan.nh2002
+    * abca05786
+    * hoang.nh0615
+    * quan.nguyen232.work
+
 Discussion:
 * Pivot model has en-fr BLEU 33 (much lower than training separately) because we did not assign the correct weight for the loss (hypothesis). Thus we can try dynamic ensemble loss in the future
 
