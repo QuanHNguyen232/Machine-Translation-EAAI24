@@ -6,102 +6,88 @@
 Trainer file
 """
 #%%
+import os
 import sys
-sys.path.append('../')
-from dataset import dataloader
-from utils import util, process
-from dataset.dataloader import MyDataset
-import pickle
-from tqdm import tqdm
-import numpy as np
-
-from models import base, baseattn
-from models.baseattn import Encoder_Attn, Decoder_Attn, Seq2Seq_Attn
 
 import torch
 import torch.nn as nn
-from torch import optim
+import torch.optim as optim
 
-#%%
+from dataset import get_dataset_dataloader
+from models import Seq2SeqRNN, PivotSeq2Seq
+from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
+from models import train_epoch, eval_epoch
+from utils import util
+
+#%% LOAD cfg and constants
+
+langs = ['en', 'fr']
+UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
 cfg = util.load_cfg()
-device = "cuda" if torch.cuda.is_available() else "cpu"
-#%%
-# input_lang, output_lang, pairs = process.prepareData(cfg)
+device = cfg['device']
 
-# util.savePickle(input_lang, output_lang, pairs)
-input_lang, output_lang, pairs = util.loadPickle()
+cfg, device
 
-#%%
-dataset_obj = MyDataset(input_lang, output_lang, pairs[:cfg['dataset_len']], cfg)
-dataloader1 = torch.utils.data.DataLoader(dataset_obj, batch_size=cfg['batch_size'])
+#%% LOAD dataloader
 
-#%%
-input_size_enc = input_lang.n_words
-input_size_dec = output_lang.n_words
+cfg['data_path'] = './data/endefr_75kpairs_2k5-freq-words.pkl'
+data = util.load_data(cfg['data_path'])
 
-#%%
-encoder_attn = Encoder_Attn(input_size_enc, cfg)
-decoder_attn = Decoder_Attn(input_size_dec, cfg)
-model_attn = Seq2Seq_Attn(encoder_attn, decoder_attn, cfg, device)
-model_attn.apply(util.init_weights);
+train_pt = cfg['train_len']
+valid_pt = train_pt + cfg['valid_len']
+test_pt = valid_pt + cfg['test_len']
 
-#%%
-optimizer = optim.Adam(model_attn.parameters(), lr=cfg['learning_rate'])
-criterion = nn.CrossEntropyLoss(ignore_index=cfg['PAD_token'], label_smoothing=0.5)
+tmp_set, tmp_loader = get_dataset_dataloader(
+  data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device
+)
 
-#%%
-def train_fn(model: nn.Module, dataloader: torch.utils.data.DataLoader, optimizer: torch.optim, criterion):
-  model.train()
-  total_loss = 0.0
-  for i, ((en_vec, fr_vec), (en, fr)) in tqdm(enumerate(dataloader)):
-    en_vec = en_vec.to(device)
-    fr_vec = fr_vec.to(device)
+#%% LOAD model
 
-    # Forward prop
-    output = model(en_vec, fr_vec)  # (seq_len, N, target_vocab_size)
+model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+save_cfg(model)
+model.cfg
 
-    # Output is of shape (trg_len, batch_size, output_dim) but Cross Entropy Loss
-    # doesn't take input in that form. For example if we have MNIST we want to have
-    # output to be: (N, 10) and targets just (N). Here we can view it in a similar
-    # way that we have output_words * batch_size that we want to send in into
-    # our cost function, so we need to do some reshapin. While we're at it
-    # Let's also remove the start token while we're at it
-    output = output[1:].reshape(-1, output.shape[2])  # shape = (trg_len * N, target_vocab_size)
-    
-    fr_vec = fr_vec.permute(1, 0) # (N, seq_len) --> (seq_len, N)
-    target = fr_vec[1:].reshape(-1) # shape = (trg_len * batch_size)
-    # output[1:]: ignore SOS_token
-    
-    #https://github.com/bentrevett/pytorch-seq2seq/blob/master/1%20-%20Sequence%20to%20Sequence%20Learning%20with%20Neural%20Networks.ipynb
+#%% LOAD criterion/optim/scheduler
 
-    optimizer.zero_grad()
-    loss = criterion(output, target)
-    loss.backward()
+criterion = nn.CrossEntropyLoss(ignore_index = PAD_ID)
 
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
-    optimizer.step()
-    
-    total_loss += loss.item()
-    
-    # if i==5: break
-  return total_loss/len(dataloader)
+optimizer = optim.Adam(model.parameters(), lr=model.cfg['LR'])
+scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=model.cfg['scheduler']['milestones'], gamma=model.cfg['scheduler']['gamma'])
+scheduler.get_last_lr()
 
-#%%
+
+#%% train loop
+
+curr_iter = 0
+isContinue = True
+best_valid_loss = float('inf')
 best_train_loss = float('inf')
-train_log = []
-model_name = 'abc.pt'
 
-for epoch in range(10):
-  train_loss = train_fn(model_attn, dataloader1, optimizer, criterion)
-  print(f'EPOCH: {epoch} \t train_loss = {train_loss}')  
-  
-  # valid_loss = 0.0
-  # epoch_info = (model_name, cfg['learning_rate'], cfg['batch_size'], cfg['hidden_size'], cfg['num_layers'],
-  #               cfg['enc_dropout'], cfg['dec_dropout'], epoch, cfg['epoch'], train_loss, valid_loss)
-  # train_log.append(epoch_info)
-  # if train_loss < best_train_loss:
-  #   best_train_loss = train_loss
-  #   train_log = update_trainlog(train_log)
-  #   save_model(model_attn)
+num_epochs = cfg['NUM_ITERS'] // len(train_iterator) + 1
+print('num_epochs', num_epochs)
+
+train_log = []
+train_loss = valid_loss = 0
+
+for epoch in range(num_epochs):
+  train_loss = train_epoch(model, train_iterator, optimizer, criterion, scheduler)
+  valid_loss = eval_epoch(model, valid_iterator, criterion)
+
+  epoch_info = [scheduler.get_last_lr()[0], curr_iter, model.cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
+  train_log.append([str(info) for info in epoch_info])
+
+  if train_loss < best_train_loss or valid_loss < best_valid_loss:
+    best_train_loss = train_loss
+    best_valid_loss = valid_loss
+
+    save_model(model=model, optimizer=optimizer, scheduler=scheduler)
+    train_log = update_trainlog(model, train_log)
+
+  print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
+
+  if not isContinue:
+    train_log = update_trainlog(model, train_log)
+    break
+
   

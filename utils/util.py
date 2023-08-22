@@ -45,15 +45,6 @@ def update_trainlog(data: list, filename: str='./log/training_log.txt'):
     print('update_trainlog SUCCESS')
     return []
 
-def save_model(model: nn.Module, filename: str):
-    torch.save(model.state_dict(), filename)
-    print('SAVED MODEL')
-
-def load_model(model: nn.Module, filename: str):
-    model.load_state_dict(torch.load(filename))
-    print('LOADED MODEL')
-    return model
-
 def load_trainlog(filename: str='./log/training_log.txt'):
     ''' Load training log as pandas dataframe
     Args:
