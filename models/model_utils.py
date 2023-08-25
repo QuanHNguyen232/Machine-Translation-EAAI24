@@ -74,11 +74,11 @@ def train_epoch(model, iterator, optimizer, criterion, scheduler):
     optimizer.zero_grad()
     # datas = self.prep_input(batch) # [batch.en, batch.fr]
     loss, _ = model(batch, criterion, 0.5)
-
+    epoch_loss += loss.item()
+    
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), model.cfg['CLIP'])
     optimizer.step()
-    epoch_loss += loss.item()
     scheduler.step()
 
     # update iter count

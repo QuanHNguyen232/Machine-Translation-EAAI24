@@ -10,6 +10,7 @@ import random
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from .networks import EncoderRNN, DecoderRNN, AttentionRNN
 from .model_utils import init_weights
@@ -20,11 +21,9 @@ class Seq2SeqRNN(nn.Module):
     self.cfg = copy.deepcopy(cfg)
     self.cfg.pop('piv', '')
     self.cfg.pop('tri', '')
-    self.cfg['seq2seq']['model_lang'] = (self.in_lang, self.out_lang) = (in_lang, out_lang)
+    self.cfg['seq2seq']['model_lang'] = self.model_lang = (self.in_lang, self.out_lang) = (in_lang, out_lang)
     self.cfg['model_id'] = self.modelname = 'RNN_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
-
-    os.makedirs(self.save_dir, exist_ok=True)
 
     attn = AttentionRNN(cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'])
     self.encoder = EncoderRNN(cfg['seq2seq'][f'{self.in_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
@@ -33,13 +32,14 @@ class Seq2SeqRNN(nn.Module):
     self.src_pad_idx = src_pad_idx
     self.device = device
 
+    os.makedirs(self.save_dir, exist_ok=True)
     self.apply(init_weights)
 
   def create_mask(self, src):
     mask = (src != self.src_pad_idx).permute(1, 0)
     return mask
 
-  def forward(self, batch, criterion=None, teacher_forcing_ratio = 0.5):
+  def forward(self, batch, criterion=None, teacher_forcing_ratio=0.5):
     # batch: dict of langs
     #src = [src len, batch size]
     #src_len = [batch size]

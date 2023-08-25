@@ -8,6 +8,7 @@ Trainer file
 #%%
 import os
 import sys
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -31,16 +32,15 @@ cfg, device
 
 #%% LOAD dataloader
 
-cfg['data_path'] = './data/endefr_75kpairs_2k5-freq-words.pkl'
 data = util.load_data(cfg['data_path'])
 
 train_pt = cfg['train_len']
 valid_pt = train_pt + cfg['valid_len']
 test_pt = valid_pt + cfg['test_len']
 
-tmp_set, tmp_loader = get_dataset_dataloader(
-  data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device
-)
+train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device)
+valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device)
+len(train_iterator), len(valid_iterator)
 
 #%% LOAD model
 
@@ -50,10 +50,9 @@ model.cfg
 
 #%% LOAD criterion/optim/scheduler
 
-criterion = nn.CrossEntropyLoss(ignore_index = PAD_ID)
-
+criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
 optimizer = optim.Adam(model.parameters(), lr=model.cfg['LR'])
-scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=model.cfg['scheduler']['milestones'], gamma=model.cfg['scheduler']['gamma'])
+scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*len(train_iterator)) for ratio in model.cfg['scheduler']['milestones']], gamma=model.cfg['scheduler']['gamma'])
 scheduler.get_last_lr()
 
 

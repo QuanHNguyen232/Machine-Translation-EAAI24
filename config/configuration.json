@@ -5,19 +5,22 @@
         "DROPOUT": 0.5,
         "en_DIM": 6964,
         "fr_DIM": 9700,
-        "es_DIM": 10461,
-        "it_DIM": 10712,
-        "pt_DIM": 10721,
-        "ro_DIM": 11989
+        "de_DIM": 12139,
+        "es_DIM": 10460,
+        "it_DIM": 10700,
+        "pt_DIM": 10720,
+        "ro_DIM": 11988
     },
     "piv": {
         "lambda": 0.001,
-        "is_share_emb": false
+        "is_share_emb": true
     },
     "tri": {
-        "method": "max"
+        "alpha": 1.1,
+        "method": "max",
+        "is_train_backbone": true
     },
-    "BATCH_SIZE": 32,
+    "BATCH_SIZE": 16,
     "train_len": 64000,
     "valid_len": 3200,
     "test_len": 6400,
@@ -25,7 +28,7 @@
     "NUM_ITERS": 16000,
     "CLIP": 1.0,
     "model_id": "test_0",
-    "scheduler": {"milestones": [8000, 12000, 14000] ,"gamma": 0.3333333333333333},
+    "scheduler": {"milestones": [0.35, 0.6, 0.8] ,"gamma": 0.3333333333333333},
     "save_dir": "saved/",
     "data_path": "path_to_EnDeFrItEsPtRo-76k-most5k.pkl"
 }

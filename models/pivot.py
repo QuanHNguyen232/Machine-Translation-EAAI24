@@ -13,6 +13,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from .seq2seq import Seq2SeqRNN
+from .model_utils import init_weights
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
@@ -21,11 +22,9 @@ class PivotSeq2Seq(nn.Module):
     super().__init__()
     self.cfg = copy.deepcopy(cfg)
     self.cfg.pop('tri', '')
-    self.cfg['piv']['model_lang'] = []
+    self.cfg['piv']['model_lang'] = self.model_lang = []
     self.cfg['model_id'] = self.modelname = 'piv_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
-    
-    os.makedirs(self.save_dir, exist_ok=True)
 
     self.num_model = len(models)
     self.add_submodels(models)
@@ -33,6 +32,9 @@ class PivotSeq2Seq(nn.Module):
       self.set_share_emb()
 
     self.device = device
+
+    os.makedirs(self.save_dir, exist_ok=True)
+    self.apply(init_weights)
 
   def add_submodels(self, models: list):
     # validity check
@@ -43,7 +45,7 @@ class PivotSeq2Seq(nn.Module):
     # add submodel
     for i, submodel in enumerate(models):
       self.add_module(f'model_{i}', submodel)
-      self.cfg['piv']['model_lang'].append((submodel.in_lang, submodel.out_lang))
+      self.cfg['piv']['model_lang'].append(submodel.cfg['seq2seq']['model_lang'])
 
   def set_share_emb(self):
     for i in range(1, self.num_model):
@@ -52,16 +54,15 @@ class PivotSeq2Seq(nn.Module):
       curr_model.encoder.embedding = prev_model.decoder.embedding
 
   def forward(self, batch, criterion=None, teacher_forcing_ratio=0.5):
+    loss_list, output_list = self.run(batch, criterion, teacher_forcing_ratio)
     if criterion != None:
-      loss_list, output_list = self.run(batch, criterion, teacher_forcing_ratio)
       total_loss = self.compute_loss(loss_list)
       return total_loss, output_list[-1]
     else:
-      _, output_list = self.run(batch, criterion, teacher_forcing_ratio)
       return output_list[-1]
 
   def run(self, batch, criterion, teacher_forcing_ratio):
-    output_list, loss_list = [], []
+    loss_list, output_list = [], []
     for i in range(self.num_model):
       # i==0: 1st model must always use src
       isForceOn = True if i==0 else random.random() < teacher_forcing_ratio
@@ -71,7 +72,7 @@ class PivotSeq2Seq(nn.Module):
 
       # GET NEW INPUT if needed
       if not isForceOn: # use prev_model's output as curr_model input
-        (src, src_len), (_, _) = model.prep_input(batch)
+        # (src, src_len), (tgt, tgt_len) = model.prep_input(batch) # delete later
         src, src_len = self.process_output(output_list[-1])
         batch[model.in_lang] = (src, src_len)
 
@@ -83,9 +84,8 @@ class PivotSeq2Seq(nn.Module):
         output_list.append(output)
       else:
         assert len(output) == 2, 'With criterion, model should return loss & prediction'
-        loss, out = output
-        loss_list.append(loss)
-        output_list.append(out)
+        loss_list.append(output[0])
+        output_list.append(output[1])
 
     return loss_list, output_list
 
@@ -94,7 +94,7 @@ class PivotSeq2Seq(nn.Module):
     for loss in loss_list: # except final output
       total_loss += loss
     total_loss /= len(loss_list)
-    if self.cfg['piv']['is_share_emb']:
+    if not self.cfg['piv']['is_share_emb']:
       total_loss += self.cfg['piv']['lambda']*self.compute_embed_loss()
     return total_loss
 
@@ -140,3 +140,7 @@ class PivotSeq2Seq(nn.Module):
     piv_len[piv_ids] = eos_ids + 1 # seq_len = eos_tok + 1
 
     return piv, piv_len
+
+class PivotSeq2SeqMultiSrc(PivotSeq2Seq):
+  def __init__(self, cfg, models: list, device):
+    super().__init__(cfg, models, device)
