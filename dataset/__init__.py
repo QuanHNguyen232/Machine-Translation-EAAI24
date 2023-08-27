@@ -6,13 +6,14 @@
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SequentialSampler
+from torch.utils.data.distributed import DistributedSampler
 
 from .dataset import EuroParlDataset
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
-def get_dataset_dataloader(data, langs, sort_lang, batch_size, is_shuffle_by_batch, device):
+def get_dataset_dataloader(data, langs, sort_lang, batch_size, is_shuffle_by_batch, device, use_DDP, isTrainset):
 
   def get_dataset(data, langs, sort_lang, batch_size, is_shuffle_by_batch, device):
     dataset = EuroParlDataset(data, langs, sort_lang, batch_size, is_shuffle_by_batch, device)
@@ -29,5 +30,11 @@ def get_dataset_dataloader(data, langs, sort_lang, batch_size, is_shuffle_by_bat
    
   dataset = get_dataset(data, langs, sort_lang, batch_size, is_shuffle_by_batch, device)
   for tok_id, set_tok_id in zip((UNK_ID, PAD_ID, SOS_ID, EOS_ID), (dataset.unk_id, dataset.pad_id, dataset.sos_id, dataset.eos_id)): assert tok_id == set_tok_id
-  dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False)
+  if use_DDP:
+    if isTrainset:
+      dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(dataset))
+    else:
+      dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False, sampler=SequentialSampler(dataset))
+  else:
+    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False)
   return dataset, dataloader

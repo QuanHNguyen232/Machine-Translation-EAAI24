@@ -20,6 +20,7 @@
         "method": "max",
         "is_train_backbone": true
     },
+    "use_DDP": false,
     "BATCH_SIZE": 16,
     "train_len": 64000,
     "valid_len": 3200,

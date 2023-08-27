@@ -13,6 +13,8 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
 
 from dataset import get_dataset_dataloader
 from models import Seq2SeqRNN, PivotSeq2Seq
@@ -29,25 +31,39 @@ UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
 cfg = util.load_cfg()
 device = cfg['device']
+master_process = True
+
+if cfg['use_DDP']:
+  # Initialize the process group
+  init_process_group(backend='nccl')
+  # Get the DDP rank
+  ddp_rank = int(os.environ['RANK'])
+  master_process = ddp_rank == 0 # this process will do logging, checkpointing etc.
+  # Get the DDP local rank
+  ddp_local_rank = int(os.environ['LOCAL_RANK'])
+  # Set the cuda device
+  device = f'cuda:{ddp_local_rank}'
 
 cfg, device
 
 #%% LOAD dataloader
-
+cfg['data_path'] = 'data/EnDeFrItEsPtRo-76k-most5k.pkl'
 data = util.load_data(cfg['data_path'])
 
 train_pt = cfg['train_len']
 valid_pt = train_pt + cfg['valid_len']
 test_pt = valid_pt + cfg['test_len']
 
-train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device)
-valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device)
+train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], True)
+valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], False)
 len(train_iterator), len(valid_iterator)
 
 #%% LOAD model
 
 model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 save_cfg(model)
+if cfg['use_DDP']:
+  model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
 model.cfg
 
 #%% LOAD criterion/optim/scheduler
@@ -66,14 +82,14 @@ best_valid_loss = float('inf')
 best_train_loss = float('inf')
 
 num_epochs = model.cfg['NUM_ITERS'] // len(train_iterator) + 1
-print('num_epochs', num_epochs)
+if master_process: print('num_epochs', num_epochs)
 
 train_log = []
 train_loss = valid_loss = 0
 
 for epoch in range(num_epochs):
-  train_loss, curr_iter, isContinue = train_epoch(model, train_iterator, optimizer, criterion, scheduler, curr_iter, isContinue)
-  valid_loss = eval_epoch(model, valid_iterator, criterion)
+  train_loss, curr_iter, isContinue = train_epoch(master_process, model, train_iterator, optimizer, criterion, scheduler, curr_iter, isContinue)
+  valid_loss = eval_epoch(master_process, model, valid_iterator, criterion)
 
   epoch_info = [scheduler.get_last_lr()[0], curr_iter, model.cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
   train_log.append([str(info) for info in epoch_info])
@@ -85,10 +101,10 @@ for epoch in range(num_epochs):
     save_model(model=model, optimizer=optimizer, scheduler=scheduler)
     train_log = update_trainlog(model, train_log)
 
-  print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
+  if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
 
   if not isContinue:
     train_log = update_trainlog(model, train_log)
     break
 
-  
+if cfg['use_DDP']: destroy_process_group()

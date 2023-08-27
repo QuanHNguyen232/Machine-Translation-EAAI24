@@ -7,6 +7,7 @@
 import os
 import json
 from tqdm import tqdm
+from collections import OrderedDict
 
 import torch
 from torch import nn
@@ -56,7 +57,17 @@ def save_model(model, optimizer=None, scheduler=None): # DONE Checking
 def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
   # path: path to .pt file
   ckpt = torch.load(path)
-  model.load_state_dict(ckpt['model_state_dict']) # strict=False if some dimensions are different
+  try:
+    model.load_state_dict(ckpt['model_state_dict']) # strict=False if some dimensions are different
+  except:
+    try:
+      new_state_dict = OrderedDict()
+      for k, v in ckpt['model_state_dict'].items():
+        name = k[7:] # remove "module."
+        new_state_dict[name] = v
+      model.load_state_dict(new_state_dict)
+    except Exception as e:
+      print(e, '\nCannot load model')
   if optimizer is not None:
     try: optimizer.load_state_dict(ckpt['optimizer_state_dict'])
     except Exception as e: print(e, '\n\t optim state_dict IS NOT INCLUDED')
@@ -65,10 +76,14 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
     except Exception as e: print(e, '\n\t scheduler state_dict IS NOT INCLUDED')
   print('LOADED MODEL')
 
-def train_epoch(model, iterator, optimizer, criterion, scheduler, curr_iter, isContinue):
+def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, curr_iter, isContinue):
   model.train()
   epoch_loss = 0.0
-  for i, batch in enumerate(tqdm(iterator, desc=f'train [{model.modelname}]')):
+  if master_process:
+    train_progress_bar = tqdm(iterator, desc=f'train [{model.modelname}]', position=0, leave=True)
+  else:
+    train_progress_bar = iterator
+  for i, batch in enumerate(train_progress_bar):
     optimizer.zero_grad()
     # datas = self.prep_input(batch) # [batch.en, batch.fr]
     loss, _ = model(batch, criterion, 0.5)
@@ -85,11 +100,15 @@ def train_epoch(model, iterator, optimizer, criterion, scheduler, curr_iter, isC
     if not isContinue: break
   return epoch_loss / (i+1), curr_iter, isContinue
 
-def eval_epoch(model, iterator, criterion):
+def eval_epoch(master_process, model, iterator, criterion):
   model.eval()
   epoch_loss = 0.0
+  if master_process:
+    eval_progress_bar = tqdm(iterator, desc=f'eval [{model.modelname}]', position=0, leave=True)
+  else:
+    eval_progress_bar = iterator
   with torch.no_grad():
-    for batch in tqdm(iterator, desc=f'eval [{model.modelname}]'):
+    for batch in eval_progress_bar:
       # datas = self.prep_input(batch) # [batch.en, batch.fr]
       loss, _ = model(batch, criterion, 0) # turn off teacher forcing
       epoch_loss += loss.item()
