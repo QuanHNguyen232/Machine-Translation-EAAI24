@@ -65,9 +65,7 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
     except Exception as e: print(e, '\n\t scheduler state_dict IS NOT INCLUDED')
   print('LOADED MODEL')
 
-def train_epoch(model, iterator, optimizer, criterion, scheduler):
-  global curr_iter
-  global isContinue
+def train_epoch(model, iterator, optimizer, criterion, scheduler, curr_iter, isContinue):
   model.train()
   epoch_loss = 0.0
   for i, batch in enumerate(tqdm(iterator, desc=f'train [{model.modelname}]')):
@@ -85,7 +83,7 @@ def train_epoch(model, iterator, optimizer, criterion, scheduler):
     curr_iter += 1
     isContinue = curr_iter < model.cfg['NUM_ITERS']
     if not isContinue: break
-  return epoch_loss / (i+1)
+  return epoch_loss / (i+1), curr_iter, isContinue
 
 def eval_epoch(model, iterator, criterion):
   model.eval()

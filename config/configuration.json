@@ -25,7 +25,7 @@
     "valid_len": 3200,
     "test_len": 6400,
     "LR": 0.001,
-    "NUM_ITERS": 16000,
+    "NUM_ITERS": 60000,
     "CLIP": 1.0,
     "model_id": "test_0",
     "scheduler": {"milestones": [0.35, 0.6, 0.8] ,"gamma": 0.3333333333333333},

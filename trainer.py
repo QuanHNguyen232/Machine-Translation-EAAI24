@@ -65,14 +65,14 @@ isContinue = True
 best_valid_loss = float('inf')
 best_train_loss = float('inf')
 
-num_epochs = cfg['NUM_ITERS'] // len(train_iterator) + 1
+num_epochs = model.cfg['NUM_ITERS'] // len(train_iterator) + 1
 print('num_epochs', num_epochs)
 
 train_log = []
 train_loss = valid_loss = 0
 
 for epoch in range(num_epochs):
-  train_loss = train_epoch(model, train_iterator, optimizer, criterion, scheduler)
+  train_loss, curr_iter, isContinue = train_epoch(model, train_iterator, optimizer, criterion, scheduler, curr_iter, isContinue)
   valid_loss = eval_epoch(model, valid_iterator, criterion)
 
   epoch_info = [scheduler.get_last_lr()[0], curr_iter, model.cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
