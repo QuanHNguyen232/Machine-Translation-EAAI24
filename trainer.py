@@ -47,7 +47,7 @@ if cfg['use_DDP']:
 if master_process: print(device, cfg)
 
 #%% LOAD dataloader
-cfg['data_path'] = 'data/EnDeFrItEsPtRo-76k-most5k.pkl'
+
 data = util.load_data(cfg['data_path'])
 
 train_pt = cfg['train_len']
