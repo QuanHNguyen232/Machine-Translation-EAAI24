@@ -31,5 +31,5 @@
     "model_id": "test_0",
     "scheduler": {"milestones": [0.35, 0.6, 0.8] ,"gamma": 0.3333333333333333},
     "save_dir": "saved/",
-    "data_path": "path_to_EnDeFrItEsPtRo-76k-most5k.pkl"
+    "data_path": "data/EnDeFrItEsPtRo-76k-most5k.pkl"
 }

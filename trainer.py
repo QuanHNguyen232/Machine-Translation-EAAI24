@@ -44,7 +44,7 @@ if cfg['use_DDP']:
   # Set the cuda device
   device = f'cuda:{ddp_local_rank}'
 
-cfg, device
+if master_process: print(device, cfg)
 
 #%% LOAD dataloader
 cfg['data_path'] = 'data/EnDeFrItEsPtRo-76k-most5k.pkl'
@@ -56,22 +56,22 @@ test_pt = valid_pt + cfg['test_len']
 
 train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], True)
 valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], False)
-len(train_iterator), len(valid_iterator)
+if master_process: (len(train_iterator), len(valid_iterator))
 
 #%% LOAD model
 
 model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 save_cfg(model)
+if master_process: print(model.cfg)
 if cfg['use_DDP']:
   model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
-model.cfg
 
 #%% LOAD criterion/optim/scheduler
 
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
 optimizer = optim.Adam(model.parameters(), lr=model.cfg['LR'])
 scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*model.cfg['NUM_ITERS']) for ratio in model.cfg['scheduler']['milestones']], gamma=model.cfg['scheduler']['gamma'])
-scheduler.get_last_lr()
+if master_process: print(scheduler.get_last_lr())
 
 
 #%% train loop
@@ -99,7 +99,7 @@ for epoch in range(num_epochs):
     best_valid_loss = valid_loss
 
     save_model(model=model, optimizer=optimizer, scheduler=scheduler)
-    train_log = update_trainlog(model, train_log)
+    if master_process: train_log = update_trainlog(model, train_log)
 
   if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
 
