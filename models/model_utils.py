@@ -76,7 +76,7 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
     except Exception as e: print(e, '\n\t scheduler state_dict IS NOT INCLUDED')
   print('LOADED MODEL')
 
-def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, curr_iter, isContinue):
+def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, model_cfg, curr_iter, isContinue):
   model.train()
   epoch_loss = 0.0
   if master_process:
@@ -90,13 +90,13 @@ def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler
     epoch_loss += loss.item()
     
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), model.cfg['CLIP'])
+    torch.nn.utils.clip_grad_norm_(model.parameters(), model_cfg['CLIP'])
     optimizer.step()
     scheduler.step()
 
     # update iter count
     curr_iter += 1
-    isContinue = curr_iter < model.cfg['NUM_ITERS']
+    isContinue = curr_iter < model_cfg['NUM_ITERS']
     if not isContinue: break
   return epoch_loss / (i+1), curr_iter, isContinue
 
