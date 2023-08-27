@@ -59,6 +59,7 @@ class AttentionRNN(nn.Module):
   def forward(self, hidden, encoder_outputs, mask):
     #hidden = [batch size, dec hid dim]
     #encoder_outputs = [src len, batch size, enc hid dim * 2]
+    #mask = [batch size, src len]
     batch_size = encoder_outputs.shape[1]
     src_len = encoder_outputs.shape[0]
 
@@ -81,14 +82,11 @@ class DecoderRNN(nn.Module):
     self.fc_out = nn.Linear((enc_hid_dim * 2) + dec_hid_dim + emb_dim, output_dim)
     self.dropout = nn.Dropout(dropout)
 
-  def forward(self, input, hidden, encoder_outputs, mask):
-    #input = [batch size]
+  def get_context_vector(self, hidden, encoder_outputs, mask):
+    ''' get context vector of a single token (at time t) given hidden state (at time t-1)'''
     #hidden = [batch size, dec hid dim]
     #encoder_outputs = [src len, batch size, enc hid dim * 2]
     #mask = [batch size, src len]
-    input = input.unsqueeze(0)  #input = [1, batch size]
-    embedded = self.dropout(self.embedding(input))  #embedded = [1, batch size, emb dim]
-
     a = self.attention(hidden, encoder_outputs, mask) #a = [batch size, src len]
     a = a.unsqueeze(1)  #a = [batch size, 1, src len]
 
@@ -96,6 +94,19 @@ class DecoderRNN(nn.Module):
 
     weighted = torch.bmm(a, encoder_outputs)  #weighted = [batch size, 1, enc hid dim * 2]
     weighted = weighted.permute(1, 0, 2)  #weighted = [1, batch size, enc hid dim * 2]
+    return a.squeeze(1), weighted
+
+  def forward(self, input, hidden, encoder_outputs, mask):
+    #input = [batch size]
+    #hidden = [batch size, dec hid dim]
+    #encoder_outputs = [src len, batch size, enc hid dim * 2]
+    #mask = [batch size, src len]
+    input = input.unsqueeze(0)  #input = [1, batch size]
+    embedded = self.dropout(self.embedding(input))  #embedded = [1, batch size, emb dim]
+    
+    attn, weighted = self.get_context_vector(hidden, encoder_outputs, mask)
+    #weighted = [1, batch size, enc hid dim * 2]
+    #attention = [batch size, src len]
 
     rnn_input = torch.cat((embedded, weighted), dim = 2)  #rnn_input = [1, batch size, (enc hid dim * 2) + emb dim]
 
@@ -109,9 +120,10 @@ class DecoderRNN(nn.Module):
     #this also means that output == hidden
     assert (output == hidden).all()
 
-    embedded = embedded.squeeze(0)
-    output = output.squeeze(0)
-    weighted = weighted.squeeze(0)
+    embedded = embedded.squeeze(0) #embedded = [batch size, emb dim]
+    output = output.squeeze(0) #output = [batch size, dec hid dim]
+    weighted = weighted.squeeze(0) #weighted = [batch size, enc hid dim * 2]
+    hidden = hidden.squeeze(0) #hidden = [batch size, dec hid dim]
 
     prediction = self.fc_out(torch.cat((output, weighted, embedded), dim = 1))  #prediction = [batch size, output dim]
-    return prediction, hidden.squeeze(0), a.squeeze(1)
+    return prediction, hidden, attn

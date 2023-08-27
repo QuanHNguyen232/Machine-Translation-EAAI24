@@ -20,6 +20,8 @@ from models import update_trainlog, init_weights, count_parameters, save_cfg, sa
 from models import train_epoch, eval_epoch
 from utils import util
 
+torch.cuda.empty_cache()
+
 #%% LOAD cfg and constants
 
 langs = ['en', 'fr']

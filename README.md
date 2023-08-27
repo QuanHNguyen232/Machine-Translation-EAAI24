@@ -16,10 +16,16 @@ NEW TASKS:
 * [ ] Trian model: ensure outputs from all submodels match w/ target sent
 
 ### Table of content
+1. Setup environment ([go-there](#setup-environment))
 1. Config ([go-there](#config))
 1. Best models ([go-there](#best-models))
 1. Things in common ([go-there](#things-in-common))
 ---
+
+## Setup environment
+* Create conda env with Python 3.10.12
+* Install all packages in `requirements.txt` (torch 2.0.1 and torchtext 0.15.2)
+* Install spacy language packages in `setup_env.py`
 
 ## Config
 
