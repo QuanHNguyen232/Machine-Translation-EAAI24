@@ -1,5 +1,4 @@
 # Python 3.10.12
-torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 torchtext==0.15.2
 spacy
 numpy
