@@ -61,16 +61,17 @@ if master_process: (len(train_iterator), len(valid_iterator))
 #%% LOAD model
 
 model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+model_cfg = model.cfg
 save_cfg(model)
-if master_process: print(model.cfg)
+if master_process: print(model_cfg)
 if cfg['use_DDP']:
   model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
 
 #%% LOAD criterion/optim/scheduler
 
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
-optimizer = optim.Adam(model.parameters(), lr=model.cfg['LR'])
-scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*model.cfg['NUM_ITERS']) for ratio in model.cfg['scheduler']['milestones']], gamma=model.cfg['scheduler']['gamma'])
+optimizer = optim.Adam(model.parameters(), lr=model_cfg['LR'])
+scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*model_cfg['NUM_ITERS']) for ratio in model_cfg['scheduler']['milestones']], gamma=model_cfg['scheduler']['gamma'])
 if master_process: print(scheduler.get_last_lr())
 
 
@@ -81,7 +82,7 @@ isContinue = True
 best_valid_loss = float('inf')
 best_train_loss = float('inf')
 
-num_epochs = model.cfg['NUM_ITERS'] // len(train_iterator) + 1
+num_epochs = model_cfg['NUM_ITERS'] // len(train_iterator) + 1
 if master_process: print('num_epochs', num_epochs)
 
 train_log = []
@@ -91,7 +92,7 @@ for epoch in range(num_epochs):
   train_loss, curr_iter, isContinue = train_epoch(master_process, model, train_iterator, optimizer, criterion, scheduler, curr_iter, isContinue)
   valid_loss = eval_epoch(master_process, model, valid_iterator, criterion)
 
-  epoch_info = [scheduler.get_last_lr()[0], curr_iter, model.cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
+  epoch_info = [scheduler.get_last_lr()[0], curr_iter, model_cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
   train_log.append([str(info) for info in epoch_info])
 
   if train_loss < best_train_loss or valid_loss < best_valid_loss:
