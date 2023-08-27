@@ -54,7 +54,7 @@ model.cfg
 
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
 optimizer = optim.Adam(model.parameters(), lr=model.cfg['LR'])
-scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*len(train_iterator)) for ratio in model.cfg['scheduler']['milestones']], gamma=model.cfg['scheduler']['gamma'])
+scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*model.cfg['NUM_ITERS']) for ratio in model.cfg['scheduler']['milestones']], gamma=model.cfg['scheduler']['gamma'])
 scheduler.get_last_lr()
 
 
