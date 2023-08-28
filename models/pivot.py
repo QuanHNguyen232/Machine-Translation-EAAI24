@@ -21,8 +21,8 @@ class PivotSeq2Seq(nn.Module):
   def __init__(self, cfg, models: list, device):
     super().__init__()
     self.cfg = copy.deepcopy(cfg)
+    self.cfg.pop('seq2seq', '')
     self.cfg.pop('tri', '')
-    self.cfg['piv']['model_lang'] = self.model_lang = []
     self.cfg['model_id'] = self.modelname = 'piv_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
 
@@ -39,13 +39,13 @@ class PivotSeq2Seq(nn.Module):
   def add_submodels(self, models: list):
     # validity check
     for i in range(1, self.num_model):
-      assert models[i-1].out_lang == models[i].in_lang, f'{models[i-1].out_lang} != {models[i].in_lang}'
+      assert models[i-1].cfg['seq2seq']['model_lang']['out_lang'] == models[i].cfg['seq2seq']['model_lang']['in_lang']
       assert isinstance(models[i-1], Seq2SeqRNN), f'{type(models[i-1])} != Seq2SeqRNN'
       assert isinstance(models[i], Seq2SeqRNN), f'{type(models[i])} != Seq2SeqRNN'
     # add submodel
     for i, submodel in enumerate(models):
       self.add_module(f'model_{i}', submodel)
-      self.cfg['piv']['model_lang'].append(submodel.cfg['seq2seq']['model_lang'])
+      self.cfg['piv'][f'model_{i}'] = submodel.cfg
 
   def set_share_emb(self):
     for i in range(1, self.num_model):
@@ -53,32 +53,34 @@ class PivotSeq2Seq(nn.Module):
       curr_model = getattr(self, f'model_{i}')
       curr_model.encoder.embedding = prev_model.decoder.embedding
 
-  def forward(self, batch, criterion=None, teacher_forcing_ratio=0.5):
-    loss_list, output_list = self.run(batch, criterion, teacher_forcing_ratio)
+  def forward(self, batch, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
+    loss_list, output_list = self.run(batch, model_cfg, criterion, teacher_forcing_ratio)
     if criterion != None:
       total_loss = self.compute_loss(loss_list)
       return total_loss, output_list[-1]
     else:
       return output_list[-1]
 
-  def run(self, batch, criterion, teacher_forcing_ratio):
+  def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
     loss_list, output_list = [], []
     for i in range(self.num_model):
       # i==0: 1st model must always use src
       isForceOn = True if i==0 else random.random() < teacher_forcing_ratio
 
       # GET MODEL
-      model = getattr(self, f'model_{i}') # Seq2Seq model already sort src by src_len in forward
-
+      submodel = getattr(self, f'model_{i}') # Seq2Seq model already sort src by src_len in forward
+      submodel_cfg = model_cfg['piv'][f'model_{i}']
+      print('piv', f'model_{i}', submodel_cfg)
+      
       # GET NEW INPUT if needed
       if not isForceOn: # use prev_model's output as curr_model input
         # (src, src_len), (tgt, tgt_len) = model.prep_input(batch) # delete later
         src, src_len = self.process_output(output_list[-1])
-        batch[model.in_lang] = (src, src_len)
+        batch[submodel_cfg['seq2seq']['model_lang']['in_lang']] = (src, src_len)
 
       # FORWARD MODEL
       # data = [(src, src_len), (trg, trg_len)]
-      output = model(batch, criterion, 0 if criterion==None else teacher_forcing_ratio)
+      output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
       if criterion == None:
         output_list.append(output)

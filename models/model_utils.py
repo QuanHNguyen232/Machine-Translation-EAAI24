@@ -12,14 +12,14 @@ from collections import OrderedDict
 import torch
 from torch import nn
 
-def update_trainlog(model, data: list): # DONE Checking
+def update_trainlog(model_cfg, data: list): # DONE Checking
   ''' Update training log w/ new losses
   Args:
       data (List): a list of infor for many epochs as tuple, each tuple has model.name, loss, etc.
   Return:
       None: new data is appended into train-log
   '''
-  filename = os.path.join(model.save_dir, 'training_log.txt')
+  filename = os.path.join(model_cfg['save_dir'], 'training_log.txt')
   mode = 'a'
   if not os.path.exists(filename):
     data.insert(0, ['lr', 'step', 'total_step', 'train_loss', 'valid_loss', 'date_time'])
@@ -42,16 +42,16 @@ def count_parameters(model: nn.Module): # DONE Checking
   print(f'model has {num_param} params')
   return num_param
 
-def save_cfg(model): # DONE Checking
-  with open(os.path.join(model.save_dir, "cfg.json"), "w") as f:
-    f.write(json.dumps(model.cfg))
+def save_cfg(model_cfg): # DONE Checking
+  with open(os.path.join(model_cfg['save_dir'], "cfg.json"), "w") as f:
+    f.write(json.dumps(model_cfg))
   print('SAVED cfg')
 
-def save_model(model, optimizer=None, scheduler=None): # DONE Checking
+def save_model(model, model_cfg, optimizer=None, scheduler=None): # DONE Checking
   save_data = {'model_state_dict': model.state_dict()}
   if optimizer is not None: save_data['optimizer_state_dict'] = optimizer.state_dict()
   if scheduler is not None: save_data['scheduler_state_dict'] = scheduler.state_dict()
-  torch.save(save_data, os.path.join(model.save_dir, 'ckpt.pt'))
+  torch.save(save_data, os.path.join(model_cfg['save_dir'], 'ckpt.pt'))
   print('SAVED MODEL')
 
 def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
@@ -78,15 +78,16 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
 
 def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, model_cfg, curr_iter, isContinue):
   model.train()
+  modelname = model_cfg['model_id']
   epoch_loss = 0.0
   if master_process:
-    train_progress_bar = tqdm(iterator, desc=f'train [{model.modelname}]', position=0, leave=True)
+    train_progress_bar = tqdm(iterator, desc=f'train [{modelname}]', position=0, leave=True)
   else:
     train_progress_bar = iterator
   for i, batch in enumerate(train_progress_bar):
     optimizer.zero_grad()
     # datas = self.prep_input(batch) # [batch.en, batch.fr]
-    loss, _ = model(batch, criterion, 0.5)
+    loss, _ = model(batch, model_cfg, criterion, 0.5)
     epoch_loss += loss.item()
     
     loss.backward()
@@ -100,16 +101,17 @@ def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler
     if not isContinue: break
   return epoch_loss / (i+1), curr_iter, isContinue
 
-def eval_epoch(master_process, model, iterator, criterion):
+def eval_epoch(master_process, model, iterator, criterion, model_cfg):
   model.eval()
+  modelname = model_cfg['model_id']
   epoch_loss = 0.0
   if master_process:
-    eval_progress_bar = tqdm(iterator, desc=f'eval [{model.modelname}]', position=0, leave=True)
+    eval_progress_bar = tqdm(iterator, desc=f'eval [{modelname}]', position=0, leave=True)
   else:
     eval_progress_bar = iterator
   with torch.no_grad():
     for batch in eval_progress_bar:
       # datas = self.prep_input(batch) # [batch.en, batch.fr]
-      loss, _ = model(batch, criterion, 0) # turn off teacher forcing
+      loss, _ = model(batch, model_cfg, criterion, 0) # turn off teacher forcing
       epoch_loss += loss.item()
     return epoch_loss / len(iterator)

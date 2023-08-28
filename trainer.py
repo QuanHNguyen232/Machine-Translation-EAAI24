@@ -62,7 +62,7 @@ if master_process: (len(train_iterator), len(valid_iterator))
 
 model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 model_cfg = model.cfg
-save_cfg(model)
+save_cfg(model_cfg)
 if master_process: print(model_cfg)
 if cfg['use_DDP']:
   model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
@@ -99,7 +99,7 @@ for epoch in range(num_epochs):
     best_train_loss = train_loss
     best_valid_loss = valid_loss
 
-    save_model(model=model, optimizer=optimizer, scheduler=scheduler)
+    save_model(model=model, model_cfg=model_cfg, optimizer=optimizer, scheduler=scheduler)
     if master_process: train_log = update_trainlog(model, train_log)
 
   if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')

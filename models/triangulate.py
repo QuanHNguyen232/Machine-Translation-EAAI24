@@ -23,7 +23,8 @@ class TriangSeq2Seq(nn.Module):
     # output_dim = trg vocab size
     super().__init__()
     self.cfg = copy.deepcopy(cfg)
-    self.cfg['tri']['model_lang'] = {}
+    self.cfg.pop('seq2seq', '')
+    self.cfg.pop('piv', '')
     self.cfg['model_id'] = self.modelname = 'tri_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
 
@@ -63,16 +64,16 @@ class TriangSeq2Seq(nn.Module):
       # add submodel
       for param in submodel.parameters(): param.requires_grad = self.is_train_backbone
       self.add_module(f'model_{i}', submodel)
-      self.cfg['tri']['model_lang'][f'model_{i}'] = submodel.model_lang
+      self.cfg['tri'][f'model_{i}'] = submodel.cfg
 
-  def forward(self, batch: dict, criterion=None, teacher_forcing_ratio=0.5):
+  def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     '''
     batch: dict of data:
       {"model_0": (src, src_len, trg, trg_len), "model_1": [(src, src_len), (piv, piv_len), (trg, trg_len)], ..., "TRG": (trg, trg_len)}
       src = [src len, batch size]
       src_len = [batch size]
     '''
-    loss_list, output_list = self.run(batch, criterion, teacher_forcing_ratio)
+    loss_list, output_list = self.run(batch, model_cfg, criterion, teacher_forcing_ratio)
     final_out = self.get_final_pred(output_list)
     if criterion != None:
       total_loss = self.compute_submodels_loss(loss_list)
@@ -82,11 +83,13 @@ class TriangSeq2Seq(nn.Module):
     else:
       return final_out
 
-  def run(self, batch, criterion, teacher_forcing_ratio):
+  def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
     loss_list, output_list = [], []
     for i in range(self.num_model):
-      model = getattr(self, f'model_{i}')
-      output = model(batch, criterion, 0 if criterion==None else teacher_forcing_ratio)
+      submodel = getattr(self, f'model_{i}')
+      submodel_cfg = model_cfg['tri'][f'model_{i}']
+      print('tri', f'model_{i}', submodel_cfg)
+      output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
       if criterion == None:
         output_list.append(output)

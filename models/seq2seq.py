@@ -21,13 +21,13 @@ class Seq2SeqRNN(nn.Module):
     self.cfg = copy.deepcopy(cfg)
     self.cfg.pop('piv', '')
     self.cfg.pop('tri', '')
-    self.cfg['seq2seq']['model_lang'] = self.model_lang = (self.in_lang, self.out_lang) = (in_lang, out_lang)
+    self.cfg['seq2seq']['model_lang'] = self.model_lang = {"in_lang": in_lang, "out_lang": out_lang}
     self.cfg['model_id'] = self.modelname = 'RNN_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
 
     attn = AttentionRNN(cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'])
-    self.encoder = EncoderRNN(cfg['seq2seq'][f'{self.in_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
-    self.decoder = DecoderRNN(cfg['seq2seq'][f'{self.out_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'], attn)
+    self.encoder = EncoderRNN(cfg['seq2seq'][f'{in_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
+    self.decoder = DecoderRNN(cfg['seq2seq'][f'{out_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'], attn)
 
     self.src_pad_idx = src_pad_idx
     self.device = device
@@ -39,14 +39,15 @@ class Seq2SeqRNN(nn.Module):
     mask = (src != self.src_pad_idx).permute(1, 0)
     return mask
 
-  def forward(self, batch, criterion=None, teacher_forcing_ratio=0.5):
+  def forward(self, batch, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     # batch: dict of langs
     #src = [src len, batch size]
     #src_len = [batch size]
     #trg = [trg len, batch size]
     #trg_len = [batch size]
     #teacher_forcing_ratio is probability of using trg to be input else prev output to be input for next prediction.
-    (src, src_len), (trg, _) = self.prep_input(batch)
+    (src, src_len), (trg, _) = self.prep_input(batch, model_cfg)
+    print('seq2seq', model_cfg['seq2seq']['model_lang']['in_lang'], model_cfg['seq2seq']['model_lang']['out_lang'])
     batch_size = src.shape[1]
     trg_len = trg.shape[0]
     trg_vocab_size = self.decoder.output_dim
@@ -96,8 +97,11 @@ class Seq2SeqRNN(nn.Module):
     unsort_ids = sort_ids.argsort()
     return sort_ids, unsort_ids
 
-  def prep_input(self, batch):
+  def prep_input(self, batch, model_cfg):
     '''
     batch: dict of langs. each lang is tuple (seq_batch, seq_lens)
     '''
-    return (batch[self.in_lang], batch[self.out_lang])
+    return (
+      batch[model_cfg['seq2seq']['model_lang']['in_lang']],
+      batch[model_cfg['seq2seq']['model_lang']['out_lang']]
+    )
