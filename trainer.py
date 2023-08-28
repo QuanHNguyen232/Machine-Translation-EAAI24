@@ -114,7 +114,7 @@ for epoch in range(num_epochs):
     save_model(model=model, model_cfg=model_cfg, optimizer=optimizer, scheduler=scheduler)
     if master_process: print('SAVED MODEL')
     if master_process:
-      update_trainlog(model, train_log)
+      update_trainlog(model_cfg, train_log)
       train_log = []
       print('update_trainlog SUCCESS')
 
@@ -122,7 +122,7 @@ for epoch in range(num_epochs):
 
   if not isContinue:
     if master_process:
-      update_trainlog(model, train_log)
+      update_trainlog(model_cfg, train_log)
       print('update_trainlog SUCCESS')
     break
 
