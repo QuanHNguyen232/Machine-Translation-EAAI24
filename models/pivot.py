@@ -70,7 +70,6 @@ class PivotSeq2Seq(nn.Module):
       # GET MODEL
       submodel = getattr(self, f'model_{i}') # Seq2Seq model already sort src by src_len in forward
       submodel_cfg = model_cfg['piv'][f'model_{i}']
-      print('piv', f'model_{i}', submodel_cfg)
       
       # GET NEW INPUT if needed
       if not isForceOn: # use prev_model's output as curr_model input

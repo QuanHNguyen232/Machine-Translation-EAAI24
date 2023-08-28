@@ -27,8 +27,6 @@ def update_trainlog(model_cfg, data: list): # DONE Checking
   with open(filename, mode) as f: # save
     for item in data:
       f.write(','.join(item) + '\n')
-  print('update_trainlog SUCCESS')
-  return []
 
 def init_weights(m): # DONE Checking
   for name, param in m.named_parameters():
@@ -39,20 +37,17 @@ def init_weights(m): # DONE Checking
 
 def count_parameters(model: nn.Module): # DONE Checking
   num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
-  print(f'model has {num_param} params')
   return num_param
 
 def save_cfg(model_cfg): # DONE Checking
   with open(os.path.join(model_cfg['save_dir'], "cfg.json"), "w") as f:
     f.write(json.dumps(model_cfg))
-  print('SAVED cfg')
 
 def save_model(model, model_cfg, optimizer=None, scheduler=None): # DONE Checking
   save_data = {'model_state_dict': model.state_dict()}
   if optimizer is not None: save_data['optimizer_state_dict'] = optimizer.state_dict()
   if scheduler is not None: save_data['scheduler_state_dict'] = scheduler.state_dict()
   torch.save(save_data, os.path.join(model_cfg['save_dir'], 'ckpt.pt'))
-  print('SAVED MODEL')
 
 def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
   # path: path to .pt file
@@ -74,7 +69,6 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
   if scheduler is not None:
     try: scheduler.load_state_dict(ckpt['scheduler_state_dict'])
     except Exception as e: print(e, '\n\t scheduler state_dict IS NOT INCLUDED')
-  print('LOADED MODEL')
 
 def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, model_cfg, curr_iter, isContinue):
   model.train()

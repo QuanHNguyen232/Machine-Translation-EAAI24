@@ -47,7 +47,6 @@ class Seq2SeqRNN(nn.Module):
     #trg_len = [batch size]
     #teacher_forcing_ratio is probability of using trg to be input else prev output to be input for next prediction.
     (src, src_len), (trg, _) = self.prep_input(batch, model_cfg)
-    print('seq2seq', model_cfg['seq2seq']['model_lang']['in_lang'], model_cfg['seq2seq']['model_lang']['out_lang'])
     batch_size = src.shape[1]
     trg_len = trg.shape[0]
     trg_vocab_size = self.decoder.output_dim

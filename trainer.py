@@ -60,20 +60,21 @@ if master_process: (len(train_iterator), len(valid_iterator))
 
 #%% LOAD model
 # Seq2Seq
-# model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # Piv
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='en', src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # Tri
-model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
-model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
-model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
-z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
-model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
+# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
+# model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
 
 model_cfg = model.cfg
 save_cfg(model_cfg)
+if master_process: print('SAVED cfg')
 if master_process: print(model_cfg)
 if cfg['use_DDP']:
   model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
@@ -111,12 +112,18 @@ for epoch in range(num_epochs):
     best_valid_loss = valid_loss
 
     save_model(model=model, model_cfg=model_cfg, optimizer=optimizer, scheduler=scheduler)
-    if master_process: train_log = update_trainlog(model, train_log)
+    if master_process: print('SAVED MODEL')
+    if master_process:
+      update_trainlog(model, train_log)
+      train_log = []
+      print('update_trainlog SUCCESS')
 
   if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
 
   if not isContinue:
-    train_log = update_trainlog(model, train_log)
+    if master_process:
+      update_trainlog(model, train_log)
+      print('update_trainlog SUCCESS')
     break
 
 if cfg['use_DDP']: destroy_process_group()

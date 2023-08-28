@@ -86,9 +86,10 @@ class TriangSeq2Seq(nn.Module):
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
     loss_list, output_list = [], []
     for i in range(self.num_model):
+      # GET MODEL
       submodel = getattr(self, f'model_{i}')
       submodel_cfg = model_cfg['tri'][f'model_{i}']
-      print('tri', f'model_{i}', submodel_cfg)
+      # FORWARD MODEL
       output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
       if criterion == None:
