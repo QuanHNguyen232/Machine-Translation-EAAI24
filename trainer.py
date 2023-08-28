@@ -17,7 +17,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 from dataset import get_dataset_dataloader
-from models import Seq2SeqRNN, PivotSeq2Seq
+from models import Seq2SeqRNN, PivotSeq2Seq, PivotSeq2SeqMultiSrc, TriangSeq2Seq, TriangSeq2SeqMultiSrc
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from utils import util
@@ -59,11 +59,19 @@ valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], lang
 if master_process: (len(train_iterator), len(valid_iterator))
 
 #%% LOAD model
-
+# Seq2Seq
 # model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# Piv
+# model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='en', src_pad_idx=PAD_ID, device=device).to(device)
+# model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
+# Tri
+model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
-model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='en', src_pad_idx=PAD_ID, device=device).to(device)
-model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device)
+model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
+model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
+
 model_cfg = model.cfg
 save_cfg(model_cfg)
 if master_process: print(model_cfg)
