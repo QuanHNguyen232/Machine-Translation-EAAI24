@@ -60,7 +60,10 @@ if master_process: (len(train_iterator), len(valid_iterator))
 
 #%% LOAD model
 
-model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+# model = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
+model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='en', src_pad_idx=PAD_ID, device=device).to(device)
+model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device)
 model_cfg = model.cfg
 save_cfg(model_cfg)
 if master_process: print(model_cfg)
