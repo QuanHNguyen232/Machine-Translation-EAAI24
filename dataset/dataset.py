@@ -7,7 +7,7 @@
 import random
 import spacy
 from tqdm import tqdm
-from itertools import islice
+from itertools import islice, groupby
 from collections import defaultdict
 
 import torchtext
@@ -90,8 +90,17 @@ class EuroParlDataset(Dataset):
         tmp_dict[lang] = [self.tok2id(tokens, lang), len(tokens)]
       my_data.append(tmp_dict)
     my_data = sorted(my_data, key=lambda x : x[self.sort_lang][1], reverse=True)
+    my_data = self.shuffle_by_group_len(my_data)
     return my_data
 
+  def shuffle_by_group_len(self, sorted_data):
+    my_data = []
+    for k, g in groupby(sorted_data, lambda x: x[self.sort_lang][1]):
+      g = list(g)
+      random.shuffle(g)
+      my_data.extend(g)
+    return my_data
+  
   def shuffle_by_batch(self, data, batch_size: int):
     def chunk_split(arr, batch_size):
       arr = iter(arr)
