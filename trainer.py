@@ -102,7 +102,7 @@ train_loss = valid_loss = 0
 
 for epoch in range(num_epochs):
   train_loss, curr_iter, isContinue = train_epoch(master_process, model, train_iterator, optimizer, criterion, scheduler, model_cfg, curr_iter, isContinue)
-  valid_loss = eval_epoch(master_process, model, valid_iterator, criterion)
+  valid_loss = eval_epoch(master_process, model, valid_iterator, criterion, model_cfg)
 
   epoch_info = [scheduler.get_last_lr()[0], curr_iter, model_cfg['NUM_ITERS'], train_loss, valid_loss, f'{datetime.now().strftime("%d/%m/%Y-%H:%M:%S")}']
   train_log.append([str(info) for info in epoch_info])
