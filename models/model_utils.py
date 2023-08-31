@@ -11,6 +11,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
+import torchtext
 
 def update_trainlog(model_cfg, data: list): # DONE Checking
   ''' Update training log w/ new losses
@@ -43,11 +44,12 @@ def save_cfg(model_cfg): # DONE Checking
   with open(os.path.join(model_cfg['save_dir'], "cfg.json"), "w") as f:
     f.write(json.dumps(model_cfg))
 
-def save_model(model, model_cfg, optimizer=None, scheduler=None): # DONE Checking
+def save_model(model, model_cfg, isBestValid, optimizer=None, scheduler=None): # DONE Checking
   save_data = {'model_state_dict': model.state_dict()}
   if optimizer is not None: save_data['optimizer_state_dict'] = optimizer.state_dict()
   if scheduler is not None: save_data['scheduler_state_dict'] = scheduler.state_dict()
-  torch.save(save_data, os.path.join(model_cfg['save_dir'], 'ckpt.pt'))
+  ckpt_name = f'ckpt_bestValid.pt' if isBestValid else f'ckpt_bestTrain.pt'
+  torch.save(save_data, os.path.join(model_cfg['save_dir'], ckpt_name))
 
 def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
   # path: path to .pt file
@@ -73,6 +75,8 @@ def load_model(model, path, optimizer=None, scheduler=None): # DONE Checking
 def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler, model_cfg, curr_iter, isContinue):
   model.train()
   modelname = model_cfg['model_id']
+  old_loss = 0
+  if torchtext.__version__ == '0.6.0': isToDict=True
   epoch_loss = 0.0
   if master_process:
     train_progress_bar = tqdm(iterator, desc=f'train [{modelname}]', position=0, leave=True)
@@ -81,13 +85,20 @@ def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler
   for i, batch in enumerate(train_progress_bar):
     optimizer.zero_grad()
     # datas = self.prep_input(batch) # [batch.en, batch.fr]
+    if isToDict: batch = vars(batch)
     loss, _ = model(batch, model_cfg, criterion, 0.5)
     epoch_loss += loss.item()
-    
+
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), model_cfg['CLIP'])
     optimizer.step()
     scheduler.step()
+
+    # verbose
+    if (curr_iter+1)%model_cfg['verbose_interval']==0:
+      old_loss = epoch_loss - old_loss
+      interval_loss = old_loss / model_cfg['verbose_interval']
+      print(f'curr_iter: {curr_iter} \t Train Loss: {interval_loss:.3f}')
 
     # update iter count
     curr_iter += 1
@@ -98,6 +109,7 @@ def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler
 def eval_epoch(master_process, model, iterator, criterion, model_cfg):
   model.eval()
   modelname = model_cfg['model_id']
+  if torchtext.__version__ == '0.6.0': isToDict=True
   epoch_loss = 0.0
   if master_process:
     eval_progress_bar = tqdm(iterator, desc=f'eval [{modelname}]', position=0, leave=True)
@@ -106,6 +118,7 @@ def eval_epoch(master_process, model, iterator, criterion, model_cfg):
   with torch.no_grad():
     for batch in eval_progress_bar:
       # datas = self.prep_input(batch) # [batch.en, batch.fr]
+      if isToDict: batch = vars(batch)
       loss, _ = model(batch, model_cfg, criterion, 0) # turn off teacher forcing
       epoch_loss += loss.item()
     return epoch_loss / len(iterator)

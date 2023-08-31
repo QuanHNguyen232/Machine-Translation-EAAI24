@@ -34,6 +34,7 @@ class TriangSeq2Seq(nn.Module):
     self.output_dim = cfg['seq2seq']['fr_DIM']
 
     self.num_model = len(models)
+    self.submodels = []
     self.add_submodels(models)
 
     self.device = device
@@ -63,7 +64,8 @@ class TriangSeq2Seq(nn.Module):
       assert isinstance(submodel, Seq2SeqRNN) or isinstance(submodel, PivotSeq2Seq), f'{type(submodel)} != Seq2SeqRNN or PivotSeq2Seq'
       # add submodel
       for param in submodel.parameters(): param.requires_grad = self.is_train_backbone
-      self.add_module(f'model_{i}', submodel)
+      self.submodels.append(submodel)
+      # self.add_module(f'model_{i}', submodel)
       self.cfg['tri'][f'model_{i}'] = submodel.cfg
 
   def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
@@ -87,7 +89,7 @@ class TriangSeq2Seq(nn.Module):
     loss_list, output_list = [], []
     for i in range(self.num_model):
       # GET MODEL
-      submodel = getattr(self, f'model_{i}')
+      submodel = self.submodels[i] # getattr(self, f'model_{i}')
       submodel_cfg = model_cfg['tri'][f'model_{i}']
       # FORWARD MODEL
       output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)

@@ -103,7 +103,7 @@ class DecoderRNN(nn.Module):
     #mask = [batch size, src len]
     input = input.unsqueeze(0)  #input = [1, batch size]
     embedded = self.dropout(self.embedding(input))  #embedded = [1, batch size, emb dim]
-    
+
     attn, weighted = self.get_context_vector(hidden, encoder_outputs, mask)
     #weighted = [1, batch size, enc hid dim * 2]
     #attention = [batch size, src len]
