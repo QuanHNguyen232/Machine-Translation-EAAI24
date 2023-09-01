@@ -33,8 +33,8 @@ class PivotSeq2Seq(nn.Module):
 
     self.device = device
 
-    os.makedirs(self.save_dir, exist_ok=True)
-    self.apply(init_weights)
+    # os.makedirs(self.save_dir, exist_ok=True)
+    # self.apply(init_weights)
 
   def add_submodels(self, models: list):
     # validity check
@@ -57,9 +57,9 @@ class PivotSeq2Seq(nn.Module):
     loss_list, output_list = self.run(batch, model_cfg, criterion, teacher_forcing_ratio)
     if criterion != None:
       total_loss = self.compute_loss(loss_list)
-      return total_loss, output_list[-1]
+      return total_loss, output_list[-1], None
     else:
-      return output_list[-1]
+      return output_list[-1], None
 
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
     loss_list, output_list = [], []
@@ -81,12 +81,12 @@ class PivotSeq2Seq(nn.Module):
       # data = [(src, src_len), (trg, trg_len)]
       output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
-      if criterion == None:
-        output_list.append(output)
-      else:
-        assert len(output) == 2, 'With criterion, model should return loss & prediction'
+      if criterion != None:
+        # assert len(output) == 3, 'With criterion, model should return loss, prediction & encOut_attnIn'
         loss_list.append(output[0])
         output_list.append(output[1])
+      else:
+        output_list.append(output[0])
 
     return loss_list, output_list
 
@@ -141,7 +141,3 @@ class PivotSeq2Seq(nn.Module):
     piv_len[piv_ids] = eos_ids + 1 # seq_len = eos_tok + 1
 
     return piv, piv_len
-
-class PivotSeq2SeqMultiSrc(PivotSeq2Seq):
-  def __init__(self, cfg, models: list, device):
-    super().__init__(cfg, models, device)

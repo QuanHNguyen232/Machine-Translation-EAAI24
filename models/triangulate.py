@@ -34,39 +34,23 @@ class TriangSeq2Seq(nn.Module):
     self.output_dim = cfg['seq2seq']['fr_DIM']
 
     self.num_model = len(models)
-    self.submodels = []
+    # self.submodels = []
     self.add_submodels(models)
 
     self.device = device
 
-    if self.method=='weighted':
-      self.head = nn.Sequential(
-          nn.ReLU(),
-          nn.Linear(self.output_dim*self.num_model, self.output_dim)
-      )
-    elif self.method=='weighted_1':
-      self.head = nn.Sequential(  # traing-EnFr-EnEsFr-dense5
-            nn.Linear(self.num_model, 5),
-            nn.ReLU(),
-            nn.Dropout(p=0.2),
-            nn.Linear(5, 5),
-            nn.ReLU(),
-            nn.Dropout(p=0.2),
-            nn.Linear(5, 1),
-        )
-
-    os.makedirs(self.save_dir, exist_ok=True)
-    self.apply(init_weights)
+    # os.makedirs(self.save_dir, exist_ok=True)
+    # self.apply(init_weights)
 
   def add_submodels(self, models: list):
     for i, submodel in enumerate(models):
       # validity check
       assert isinstance(submodel, Seq2SeqRNN) or isinstance(submodel, PivotSeq2Seq), f'{type(submodel)} != Seq2SeqRNN or PivotSeq2Seq'
       # add submodel
-      for param in submodel.parameters(): param.requires_grad = self.is_train_backbone
-      self.submodels.append(submodel)
-      # self.add_module(f'model_{i}', submodel)
       self.cfg['tri'][f'model_{i}'] = submodel.cfg
+      self.add_module(f'model_{i}', submodel)
+      # for param in submodel.parameters(): param.requires_grad = self.is_train_backbone
+      # self.submodels.append(submodel)
 
   def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     '''
@@ -81,25 +65,27 @@ class TriangSeq2Seq(nn.Module):
       total_loss = self.compute_submodels_loss(loss_list)
       if self.method != 'max': # why non "max"? Is it because gradient cannot pass through that method?
         total_loss += self.alpha*self.compute_final_pred_loss(final_out, batch["fr"], criterion)
-      return total_loss, final_out
+        total_loss /= (len(loss_list) + 1)
+      else: total_loss /= len(loss_list)
+      return total_loss, final_out, None
     else:
-      return final_out
+      return final_out, None
 
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
     loss_list, output_list = [], []
     for i in range(self.num_model):
       # GET MODEL
-      submodel = self.submodels[i] # getattr(self, f'model_{i}')
+      submodel = getattr(self, f'model_{i}') #self.submodels[i]
       submodel_cfg = model_cfg['tri'][f'model_{i}']
       # FORWARD MODEL
       output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
-      if criterion == None:
-        output_list.append(output)
-      else:
-        assert len(output) == 2, 'With criterion, model should return loss & prediction'
+      if criterion != None:
+        # assert len(output) == 3, 'With criterion, model should return loss, prediction & encOut_attnIn'
         loss_list.append(output[0])
         output_list.append(output[1])
+      else:
+        output_list.append(output[0])
 
     return loss_list, output_list
 
@@ -121,15 +107,7 @@ class TriangSeq2Seq(nn.Module):
   def get_final_pred(self, output_list):  # output_list[0] shape = [seq_len, N, out_dim]
     # assert all([output_list[i].shape == output_list[i-1].shape for i in range(1, len(output_list))]), 'all outputs must match shape [seq_len, N, out_dim]'
     seq_len, N, out_dim = output_list[0].shape
-    if self.method=='weighted':
-      linear_in = torch.cat([out for out in output_list], dim=-1) # linear_in = [seq_len, N, out_dim * num_model]. Note that num_model = len(output_list)
-      final_out = self.head(linear_in)  # final_out = [seq_len, N, out_dim]
-      return final_out
-    elif self.method=='weighted_1':
-      output_list = [out.permute(1, 0, 2).reshape(N, -1) for out in output_list]  # [N, seq_len, out_dim] --> [N, seq_len*out_dim]
-      final_out = self.head(torch.stack(output_list, dim=-1)).squeeze(-1)  # [N, seq_len*out_dim, num_model] --> [N, seq_len*out_dim, 1] --> [N, seq_len*out_dim]
-      return final_out.reshape(N, seq_len, out_dim).permute(1, 0, 2) # [N, seq_len, out_dim] --> [seq_len, N, out_dim]
-    elif self.method=='average':
+    if self.method=='average':
       outputs = torch.mean(torch.stack(output_list, dim=0), dim=0)
       return outputs
     elif self.method=='max':
@@ -169,7 +147,3 @@ class TriangSeq2Seq(nn.Module):
       return output
     else:
       return output_list[0]
-
-class TriangSeq2SeqMultiSrc(TriangSeq2Seq):
-  def __init__(self, cfg, models: list, device):
-    super().__init__(cfg, models, device)

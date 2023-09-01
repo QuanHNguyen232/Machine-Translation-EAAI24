@@ -73,21 +73,21 @@ class AttentionRNN(nn.Module):
     return F.softmax(attention, dim = 1)
 
 class DecoderRNN(nn.Module):
-  def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout, attention):
+  def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):#, attention):
     super().__init__()
     self.output_dim = output_dim
-    self.attention = attention
+    # self.attention = attention
     self.embedding = nn.Embedding(output_dim, emb_dim)
     self.rnn = nn.GRU((enc_hid_dim * 2) + emb_dim, dec_hid_dim)
     self.fc_out = nn.Linear((enc_hid_dim * 2) + dec_hid_dim + emb_dim, output_dim)
     self.dropout = nn.Dropout(dropout)
 
-  def get_context_vector(self, hidden, encoder_outputs, mask):
+  def get_context_vector(self, hidden, encoder_outputs, mask, attn_model):
     ''' get context vector of a single token (at time t) given hidden state (at time t-1)'''
     #hidden = [batch size, dec hid dim]
     #encoder_outputs = [src len, batch size, enc hid dim * 2]
     #mask = [batch size, src len]
-    a = self.attention(hidden, encoder_outputs, mask) #a = [batch size, src len]
+    a = attn_model(hidden, encoder_outputs, mask) #a = [batch size, src len]
     a = a.unsqueeze(1)  #a = [batch size, 1, src len]
 
     encoder_outputs = encoder_outputs.permute(1, 0, 2)  #encoder_outputs = [batch size, src len, enc hid dim * 2]
@@ -96,7 +96,7 @@ class DecoderRNN(nn.Module):
     weighted = weighted.permute(1, 0, 2)  #weighted = [1, batch size, enc hid dim * 2]
     return a.squeeze(1), weighted
 
-  def forward(self, input, hidden, encoder_outputs, mask):
+  def forward(self, input, hidden, encoder_outputs: list, masks: list, attn_models: list):
     #input = [batch size]
     #hidden = [batch size, dec hid dim]
     #encoder_outputs = [src len, batch size, enc hid dim * 2]
@@ -104,11 +104,16 @@ class DecoderRNN(nn.Module):
     input = input.unsqueeze(0)  #input = [1, batch size]
     embedded = self.dropout(self.embedding(input))  #embedded = [1, batch size, emb dim]
 
-    attn, weighted = self.get_context_vector(hidden, encoder_outputs, mask)
-    #weighted = [1, batch size, enc hid dim * 2]
-    #attention = [batch size, src len]
+    assert len(encoder_outputs) == len(masks) and len(masks) == len(attn_models)
 
-    rnn_input = torch.cat((embedded, weighted), dim = 2)  #rnn_input = [1, batch size, (enc hid dim * 2) + emb dim]
+    attns, weighteds = [], []
+    for i in range(len(encoder_outputs)):
+      attn, weighted = self.get_context_vector(hidden, encoder_outputs[i], masks[i], attn_models[i])
+      attns.append(attn) #attn = [batch size, src len]
+      weighteds.append(weighted) #weighted = [1, batch size, enc hid dim * 2]
+    input_weight = torch.mean(torch.stack(weighteds, dim=0), dim=0) # mean of all context vector; [1, batch size, enc hid dim * 2]
+
+    rnn_input = torch.cat((embedded, input_weight), dim = 2)  #rnn_input = [1, batch size, (enc hid dim * 2) + emb dim]
 
     output, hidden = self.rnn(rnn_input, hidden.unsqueeze(0))
     #output = [seq len, batch size, dec hid dim * n directions]
@@ -126,4 +131,4 @@ class DecoderRNN(nn.Module):
     hidden = hidden.squeeze(0) #hidden = [batch size, dec hid dim]
 
     prediction = self.fc_out(torch.cat((output, weighted, embedded), dim = 1))  #prediction = [batch size, output dim]
-    return prediction, hidden, attn
+    return prediction, hidden, attns

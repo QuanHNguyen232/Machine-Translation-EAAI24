@@ -22,7 +22,7 @@ from torchtext.data import Dataset, Example
 
 # from dataset import get_dataset_dataloader
 from dataset import get_tkzer_dict, get_field_dict
-from models import Seq2SeqRNN, PivotSeq2Seq, PivotSeq2SeqMultiSrc, TriangSeq2Seq, TriangSeq2SeqMultiSrc
+from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from utils import util
@@ -31,12 +31,12 @@ torch.cuda.empty_cache()
 
 #%% LOAD cfg and constants
 
-langs = ['en', 'fr']
-UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
-
 cfg = util.load_cfg()
 device = cfg['device']
 master_process = True
+
+UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
+
 
 if cfg['use_DDP']:
   # Initialize the process group
@@ -52,6 +52,8 @@ if cfg['use_DDP']:
 if master_process: print(device, cfg)
 
 #%% get TKZERs & FIELDs
+
+langs = ['en', 'fr']
 
 tkzer_dict = get_tkzer_dict(langs)
 FIELD_DICT = get_field_dict(tkzer_dict)
@@ -88,7 +90,7 @@ for lang in langs:
   FIELD_DICT[lang].build_vocab(train_dt, min_freq=min_freq)
   print(f'{lang}: {len(FIELD_DICT[lang].vocab)}')
 
-# change lang_DIM
+# add lang_DIM
 for lang in langs:
   cfg['seq2seq'][f'{lang}_DIM'] = len(FIELD_DICT[lang].vocab)
 
@@ -99,15 +101,14 @@ if master_process: (len(train_iterator), len(valid_iterator), len(test_iterator)
 #%% LOAD model
 # Seq2Seq
 model_langs = ['en', 'fr']
-cfg['model_id'] = '-'.join(model_langs) + cfg['model_id']
 model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 model.apply(init_weights)
 # Piv
 # model_langs = ['en', 'fr', 'fr', 'en']
-# cfg['model_id'] = '-'.join(model_langs)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[2], out_lang=model_langs[3], src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
+# model.apply(init_weights)
 # Tri
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
@@ -151,14 +152,14 @@ for epoch in range(num_epochs):
   train_log.append([str(info) for info in epoch_info])
 
   if train_loss < best_train_loss or valid_loss < best_valid_loss:
-    if train_loss < best_train_loss:
-      best_train_loss = train_loss
-      save_model(model, model_cfg, isBestValid=False, optimizer=optimizer, scheduler=scheduler)
-      if master_process: print('SAVED MODEL best train')
-    else:
+    if valid_loss < best_valid_loss:
       best_valid_loss = valid_loss
       save_model(model, model_cfg, isBestValid=True, optimizer=optimizer, scheduler=scheduler)
-      if master_process: print('SAVED MODEL best valid')
+      print('SAVED MODEL best valid')
+    else:
+      best_train_loss = train_loss
+      save_model(model, model_cfg, isBestValid=False, optimizer=optimizer, scheduler=scheduler)
+      print('SAVED MODEL best train')
     if master_process:
       update_trainlog(model_cfg, train_log)
       train_log = []

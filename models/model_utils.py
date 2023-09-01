@@ -20,6 +20,7 @@ def update_trainlog(model_cfg, data: list): # DONE Checking
   Return:
       None: new data is appended into train-log
   '''
+  if not os.path.exists(model_cfg['save_dir']): os.makedirs(model_cfg['save_dir'], exist_ok=True)
   filename = os.path.join(model_cfg['save_dir'], 'training_log.txt')
   mode = 'a'
   if not os.path.exists(filename):
@@ -28,6 +29,10 @@ def update_trainlog(model_cfg, data: list): # DONE Checking
   with open(filename, mode) as f: # save
     for item in data:
       f.write(','.join(item) + '\n')
+
+def set_model_freeze(model, isFreeze):
+  for param in model.parameters():
+    param.requires_grad = not isFreeze
 
 def init_weights(m): # DONE Checking
   for name, param in m.named_parameters():
@@ -41,10 +46,12 @@ def count_parameters(model: nn.Module): # DONE Checking
   return num_param
 
 def save_cfg(model_cfg): # DONE Checking
+  if not os.path.exists(model_cfg['save_dir']): os.makedirs(model_cfg['save_dir'], exist_ok=True)
   with open(os.path.join(model_cfg['save_dir'], "cfg.json"), "w") as f:
     f.write(json.dumps(model_cfg))
 
 def save_model(model, model_cfg, isBestValid, optimizer=None, scheduler=None): # DONE Checking
+  if not os.path.exists(model_cfg['save_dir']): os.makedirs(model_cfg['save_dir'], exist_ok=True)
   save_data = {'model_state_dict': model.state_dict()}
   if optimizer is not None: save_data['optimizer_state_dict'] = optimizer.state_dict()
   if scheduler is not None: save_data['scheduler_state_dict'] = scheduler.state_dict()
@@ -86,7 +93,7 @@ def train_epoch(master_process, model, iterator, optimizer, criterion, scheduler
     optimizer.zero_grad()
     # datas = self.prep_input(batch) # [batch.en, batch.fr]
     if isToDict: batch = vars(batch)
-    loss, _ = model(batch, model_cfg, criterion, 0.5)
+    loss, _, _ = model(batch, model_cfg, criterion, 0.5)
     epoch_loss += loss.item()
 
     loss.backward()
@@ -119,6 +126,6 @@ def eval_epoch(master_process, model, iterator, criterion, model_cfg):
     for batch in eval_progress_bar:
       # datas = self.prep_input(batch) # [batch.en, batch.fr]
       if isToDict: batch = vars(batch)
-      loss, _ = model(batch, model_cfg, criterion, 0) # turn off teacher forcing
+      loss, _, _ = model(batch, model_cfg, criterion, 0) # turn off teacher forcing
       epoch_loss += loss.item()
     return epoch_loss / len(iterator)

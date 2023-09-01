@@ -22,18 +22,18 @@ class Seq2SeqRNN(nn.Module):
     self.cfg.pop('piv', '')
     self.cfg.pop('tri', '')
     self.cfg['seq2seq']['model_lang'] = self.model_lang = {"in_lang": in_lang, "out_lang": out_lang}
-    self.cfg['model_id'] = self.modelname = 'RNN_' + cfg['model_id']
+    self.cfg['model_id'] = self.modelname = 'RNN_' + '-'.join(list(self.model_lang.values())) + '_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
 
-    attn = AttentionRNN(cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'])
+    self.attn = AttentionRNN(cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'])
     self.encoder = EncoderRNN(cfg['seq2seq'][f'{in_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
-    self.decoder = DecoderRNN(cfg['seq2seq'][f'{out_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'], attn)
+    self.decoder = DecoderRNN(cfg['seq2seq'][f'{out_lang}_DIM'], cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
 
     self.src_pad_idx = src_pad_idx
     self.device = device
 
-    os.makedirs(self.save_dir, exist_ok=True)
-    self.apply(init_weights)
+    # os.makedirs(self.save_dir, exist_ok=True)
+    # self.apply(init_weights)
 
   def create_mask(self, src):
     mask = (src != self.src_pad_idx).permute(1, 0)
@@ -55,22 +55,23 @@ class Seq2SeqRNN(nn.Module):
     sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
     src, src_len, trg = src[:, sort_ids], src_len[sort_ids], trg[:, sort_ids]
 
-    #tensor to store decoder outputs
-    outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
-
-    #encoder_outputs is all hidden states of the input sequence, back and forwards
-    #hidden is the final forward and backward hidden states, passed through a linear layer
+    #encoder_outputs is all hidden states of the input sequence, back and forwards; [src len, batch size, enc hid dim * 2]
+    #hidden is the final forward and backward hidden states, passed through a linear layer; [batch size, dec hid dim]
     encoder_outputs, hidden = self.encoder(src, src_len)
 
+    # create mask for src
+    mask = self.create_mask(src)  #mask = [batch size, src len]
+    #tensor to store decoder outputs
+    outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
     #first input to the decoder is the <sos> tokens
     input = trg[0,:]
 
-    mask = self.create_mask(src)  #mask = [batch size, src len]
+    encOut_attnIn = {'enc_hid': hidden.detach().clone(),  'enc_out': encoder_outputs.detach().clone(), 'mask': mask.detach().clone()}
 
     for t in range(1, trg_len):
       #insert input token embedding, previous hidden state, all encoder hidden states and mask
       #receive output tensor (predictions) and new hidden state
-      output, hidden, _ = self.decoder(input, hidden, encoder_outputs, mask)
+      output, hidden, _ = self.decoder(input, hidden, [encoder_outputs], [mask], [self.attn])
 
       #place predictions in a tensor holding predictions for each token
       outputs[t] = output
@@ -80,8 +81,8 @@ class Seq2SeqRNN(nn.Module):
 
     if criterion != None:
       loss = self.compute_loss(outputs, trg, criterion)
-      return loss, outputs[:, unsort_ids, :]
-    return outputs[:, unsort_ids, :]
+      return loss, outputs[:, unsort_ids, :], encOut_attnIn
+    return outputs[:, unsort_ids, :], encOut_attnIn
 
   def compute_loss(self, output, trg, criterion):
     #output = (trg_len, batch_size, trg_vocab_size)
