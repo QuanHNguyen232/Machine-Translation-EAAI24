@@ -25,7 +25,7 @@ NEW TASKS:
 ## Setup environment
 * Create conda env with Python 3.10.12
 * Install torch 2.0.1: `pip3 install torch==2.0.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117`
-* Install all packages in `requirements.txt` (torch 2.0.1 and torchtext 0.15.2)
+* Install all packages in `requirements.txt` (torch 2.0.1 and torchtext 0.6.0)
 * Install spacy language packages in `setup_env.py`
 
 ## Config

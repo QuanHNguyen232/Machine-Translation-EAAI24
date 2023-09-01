@@ -99,6 +99,9 @@ for lang in langs:
 if master_process: (len(train_iterator), len(valid_iterator), len(test_iterator))
 
 #%% LOAD model
+
+# cfg['model_id'] = '?'
+
 # Seq2Seq
 model_langs = ['en', 'fr']
 model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)

@@ -1,5 +1,5 @@
 # Python 3.10.12
-torchtext==0.15.2
+torchtext==0.6.0
 spacy
 numpy
 pandas
