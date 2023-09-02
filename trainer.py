@@ -53,7 +53,7 @@ if master_process: print(device, cfg)
 
 #%% get TKZERs & FIELDs
 
-langs = ['en', 'fr']
+langs = ['en', 'it', 'fr']
 
 tkzer_dict = get_tkzer_dict(langs)
 FIELD_DICT = get_field_dict(tkzer_dict)
@@ -82,7 +82,7 @@ train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
     (train_dt, valid_dt, test_dt),
      batch_size = cfg['BATCH_SIZE'],
      sort_within_batch = True,
-     sort_key = lambda x : len(x.en),
+     sort_key = lambda x : len(vars(x)['en']),
      device = device)
 
 min_freq = 2
@@ -100,7 +100,7 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 
 #%% LOAD model
 
-# cfg['model_id'] = '?'
+cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
 
 # Seq2Seq
 # model_langs = ['en', 'fr']
@@ -109,8 +109,8 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 
 # Seq2Seq_Trans
 # cfg, in_lang, out_lang, src_pad_idx, device
-model_langs = ['en', 'fr']
-model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+# model_langs = ['en', 'fr']
+# model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 
 # Piv
 # model_langs = ['en', 'fr', 'fr', 'en']
@@ -127,9 +127,9 @@ model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
 
 # Multi-Src
-# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
-# model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
-# model.apply(init_weights)
+model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
+model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
+model.apply(init_weights)
 
 model_cfg = model.cfg
 save_cfg(model_cfg)

@@ -23,7 +23,7 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     super().__init__()
 
 class TriangSeq2SeqMultiSrc(nn.Module):
-  def __init__(self, cfg, models: list, device):
+  def __init__(self, cfg, models: list, device, verbose=False):
     super().__init__()
     # output_dim = trg vocab size
     super().__init__()
@@ -37,14 +37,14 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     self.out_lang = 'fr'
     self.output_dim = cfg['seq2seq']['fr_DIM']
 
+    self.device = device
+    self.verbose = verbose
     self.num_model = len(models)
     self.submodels = []
     self.piv_langs = []
     self.add_submodels(models, cfg)
     self.decoder = DecoderRNN(self.output_dim, cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
     self.fc = nn.Linear(cfg['seq2seq']['HID_DIM'] * (self.num_model + 1), cfg['seq2seq']['HID_DIM'])
-
-    self.device = device
 
     # os.makedirs(self.save_dir, exist_ok=True)
     # self.apply(init_weights)
@@ -81,10 +81,10 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     if criterion != None:
       total_loss = self.compute_submodels_loss(loss_list) + self.compute_final_pred_loss(final_out, batch[self.out_lang], criterion)
       total_loss /= (len(loss_list) + 1)
-      print('TriangSeq2SeqMultiSrc FORWARD')
+      if self.verbose: print('TriangSeq2SeqMultiSrc FORWARD')
       return total_loss, final_out, None
     else:
-      print('TriangSeq2SeqMultiSrc FORWARD')
+      if self.verbose: print('TriangSeq2SeqMultiSrc FORWARD')
       return final_out, None
 
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
@@ -104,7 +104,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
         output_list.append(output[1])
       else:
         output_list.append(output[0])
-    print('TriangSeq2SeqMultiSrc RUN')
+    if self.verbose: print('TriangSeq2SeqMultiSrc RUN')
     return loss_list, output_list
 
   def compute_submodels_loss(self, loss_list):
@@ -127,7 +127,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
     src, src_len = src[:, sort_ids], src_len[sort_ids]
     # for each output, feed through enc to get enc_output, hidden
-    print('get_encOut_hid get encname', encname)
+    if self.verbose: print('get_encOut_hid get encname', encname)
     encoder_output, hidden = getattr(self, encname)(src, src_len)
     # UNSORT
     encoder_output, hidden = encoder_output[:, unsort_ids, :], hidden[unsort_ids, :]
@@ -144,7 +144,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     attn_models = [getattr(self, f'attn_{i}') for i in range(self.num_model)] + [getattr(self, 'attn_en')]
     encoder_outputs, hiddens, masks = [], [], []
     for i, output in enumerate(output_list):
-      print('get_final_pred lang =', self.piv_langs[i])
+      if self.verbose: print('get_final_pred lang =', self.piv_langs[i])
       src, src_len = batch[self.piv_langs[i]] if random.random() < teacher_forcing_ratio else self.process_output(output)
       encoder_output, hidden = self.get_encOut_hid(f'enc_{i}', src, src_len)
       # add to list
@@ -166,7 +166,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
 
     # prep for Decoder: (input, hidden, encoder_outputs: list, masks: list, attn_models: list)
     input = trg[0,:] #first input to the decoder is the <sos> tokens
-    print('multi-src', f'len(encoder_outputs)={len(encoder_outputs)}', f'len(masks)={len(masks)}', f'len(attn_models)={len(attn_models)}')
+    if self.verbose: print('multi-src', f'len(encoder_outputs)={len(encoder_outputs)}', f'len(masks)={len(masks)}', f'len(attn_models)={len(attn_models)}')
     for t in range(1, trg_len):
       #insert input token embedding, previous hidden state, all encoder hidden states and mask
       #receive output tensor (predictions) and new hidden state
@@ -177,7 +177,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
 
       #if teacher forcing, use actual next token as next input. Else, use predicted token
       input = trg[t] if random.random() < teacher_forcing_ratio else output.argmax(1)
-    print('TriangSeq2SeqMultiSrc get_final_pred_')
+    if self.verbose: print('TriangSeq2SeqMultiSrc get_final_pred_')
     return outputs
 
   def sort_by_sent_len(self, sent_len):
