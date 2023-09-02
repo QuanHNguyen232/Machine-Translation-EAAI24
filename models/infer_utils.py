@@ -35,15 +35,15 @@ def idx2sent(trg_field, arr):
     results.append(pred_sent)
   return results
 
-def translate_sentence(sentence, tokenize_en, src_field, trg_field, model, model_cfg, device, max_len=64):
+def translate_sentence(sentence, tokenize_en, src_field, trg_field, model, model_cfg, device, src_lang, trg_lang, max_len=64):
     model.eval()
     with torch.no_grad():
       # get data
       src_tensor, src_len_tensor = sent2tensor(tokenize_en, src_field, trg_field, device, max_len, sentence)
       trg_tensor, trg_len_tensor = sent2tensor(tokenize_en, src_field, trg_field, device, max_len)
-      data = {'en': (src_tensor, src_len_tensor)}
+      data = {src_lang: (src_tensor, src_len_tensor)}
       for l in langs:
-        if l == 'en': continue
+        if l == src_lang: continue
         data[l] = (trg_tensor.detach().clone(), trg_len_tensor.detach().clone())
       # feed model
       output, _ = model(data, model_cfg, None, 0) # output = [trg_len, N, dec_emb_dim] w/ N=1
@@ -51,7 +51,7 @@ def translate_sentence(sentence, tokenize_en, src_field, trg_field, model, model
       results = idx2sent(trg_field, output)[0]
       return results[:-1] # remove <eos>
 
-def translate_batch(model, model_cfg, iterator, tokenize_en, src_field, trg_field, device, max_len=64, batch_lim=None):
+def translate_batch(model, model_cfg, iterator, tokenize_en, src_field, trg_field, device, src_lang, trg_lang, max_len=64, batch_lim=None):
   model.eval()
   if torchtext.__version__ == '0.6.0': isToDict=True
   with torch.no_grad():
@@ -60,17 +60,17 @@ def translate_batch(model, model_cfg, iterator, tokenize_en, src_field, trg_fiel
     for idx, batch in enumerate(tqdm(iterator)):
       # get data
       if isToDict: batch = vars(batch)
-      src = batch['en'] # (data, seq_len)
-      trg = batch['fr']
+      src = batch[src_lang] # (data, seq_len)
+      trg = batch[trg_lang]
 
       _, N = src[0].shape
       trg_tensor, trg_len_tensor = sent2tensor(tokenize_en, src_field, trg_field, device, max_len)
       trg_datas = torch.cat([trg_tensor for _ in range(N)], dim=1)
       trg_lens = torch.cat([trg_len_tensor for _ in range(N)], dim=0)
 
-      data = {'en': src}
+      data = {src_lang: src}
       for l in langs:
-        if l == 'en': continue
+        if l == src_lang: continue
         data[l] = (trg_datas.detach().clone(), trg_lens.detach().clone())
 
       # feed model
@@ -86,8 +86,8 @@ def translate_batch(model, model_cfg, iterator, tokenize_en, src_field, trg_fiel
     gt_sents = [sent[:-1] for sent in gt_sents]
     return pred_sents, gt_sents
 
-def calculate_bleu_batch(model, model_cfg, iterator, tokenizer_en, src_field, trg_field, device, max_len=64):
-  pred_sents, gt_sents = translate_batch(model, model_cfg, iterator, tokenizer_en, src_field, trg_field, device, max_len=64)
+def calculate_bleu_batch(model, model_cfg, iterator, tokenizer_en, src_field, trg_field, device, src_lang, trg_lang, max_len=64):
+  pred_sents, gt_sents = translate_batch(model, model_cfg, iterator, tokenizer_en, src_field, trg_field, device, src_lang, trg_lang, max_len=max_len)
   pred_sents = [pred_sent for pred_sent in pred_sents]
   gt_sents = [[gt_sent] for gt_sent in gt_sents]
   score = bleu_score(pred_sents, gt_sents)

@@ -24,7 +24,7 @@ from torchtext.data.metrics import bleu_score
 
 # from dataset import get_dataset_dataloader
 from dataset import get_tkzer_dict, get_field_dict
-from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq, Seq2SeqTransformer
+from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq, TriangSeq2SeqMultiSrc, Seq2SeqTransformer
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from models import translate_sentence, translate_batch, calculate_bleu_batch
@@ -56,7 +56,7 @@ if master_process: print(device, cfg)
 
 #%% get TKZERs & FIELDs
 
-langs = ['en', 'fr']
+langs = ['en', 'de', 'es', 'it', 'ro', 'pt', 'fr']
 
 tkzer_dict = get_tkzer_dict(langs)
 FIELD_DICT = get_field_dict(tkzer_dict)
@@ -85,7 +85,7 @@ train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
     (train_dt, valid_dt, test_dt),
      batch_size = cfg['BATCH_SIZE'],
      sort_within_batch = True,
-     sort_key = lambda x : len(x.en),
+     sort_key = lambda x : len(vars(x)['en']),
      device = device)
 
 min_freq = 2
@@ -99,29 +99,38 @@ for lang in langs:
 
 # train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], True)
 # valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], False)
-if master_process: (len(train_iterator), len(valid_iterator), len(test_iterator))
+if master_process: print(len(train_iterator), len(valid_iterator), len(test_iterator))
 
 #%% LOAD model
 # Seq2Seq
-# model_langs = ['en', 'fr']
-# model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
-# model.apply(init_weights)
-# Seq2Seq_Trans
-# cfg, in_lang, out_lang, src_pad_idx, device
 model_langs = ['en', 'fr']
-model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+model.apply(init_weights)
+
+# Seq2Seq_Trans
+# model_langs = ['en', 'fr']
+# model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+
 # Piv
 # model_langs = ['en', 'fr', 'fr', 'en']
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[2], out_lang=model_langs[3], src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model.apply(init_weights)
+
 # Tri
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
+
+# Multi-Src
+# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
+# model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
+# model.apply(init_weights)
+
+#%%
 
 load_model(model, 'saved/Trans_en-fr_test_1/ckpt_bestValid.pt')
 model_cfg = model.cfg
@@ -130,23 +139,26 @@ if master_process: print(model_cfg)
 
 #%% inference
 
+src_lang = 'en'
+trg_lang = 'fr'
 # by sent
-# example_idx = 12
-# src = vars(valid_dt.examples[example_idx])['en']
-# trg = vars(valid_dt.examples[example_idx])['fr']
-# pred = translate_sentence(src, tkzer_dict['en'], FIELD_DICT['en'], FIELD_DICT['fr'], model, model_cfg, device)
-# print(src)
-# print(trg)
-# print(pred)
+example_idx = 12
+src = vars(test_dt.examples[example_idx])[src_lang]
+trg = vars(test_dt.examples[example_idx])[trg_lang]
+pred = translate_sentence(src, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], model, model_cfg, device, src_lang, trg_lang)
+print(src)
+print(trg)
+print(pred)
+print(bleu_score([pred], [[trg]]))
 
 # by batch
-pred_sents, gt_sents = translate_batch(model, model_cfg, test_iterator, tkzer_dict['en'], FIELD_DICT['en'], FIELD_DICT['fr'], device, 64, 10)
-for i, (pred_sent, gt_sent) in enumerate(zip(pred_sents, gt_sents)):
-  print(pred_sent)
-  print(gt_sent)
-  print()
-  if i==3: break
+# pred_sents, gt_sents = translate_batch(model, model_cfg, test_iterator, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], device, src_lang, trg_lang, 64, 10)
+# for i, (pred_sent, gt_sent) in enumerate(zip(pred_sents, gt_sents)):
+#   print(pred_sent)
+#   print(gt_sent)
+#   print()
+#   if i==3: break
 
 # calc bleu
-# calculate_bleu_batch(model, model_cfg, valid_iterator, tkzer_dict['en'], FIELD_DICT['en'], FIELD_DICT['fr'], device)
+# calculate_bleu_batch(model, model_cfg, test_iterator, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], device, src_lang, trg_lang)
 
