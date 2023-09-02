@@ -37,15 +37,14 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     self.out_lang = 'fr'
     self.output_dim = cfg['seq2seq']['fr_DIM']
 
+    self.device = device
+    self.verbose = verbose
     self.num_model = len(models)
     self.submodels = []
     self.piv_langs = []
     self.add_submodels(models, cfg)
     self.decoder = DecoderRNN(self.output_dim, cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
     self.fc = nn.Linear(cfg['seq2seq']['HID_DIM'] * (self.num_model + 1), cfg['seq2seq']['HID_DIM'])
-
-    self.device = device
-    self.verbose = verbose
 
     # os.makedirs(self.save_dir, exist_ok=True)
     # self.apply(init_weights)
@@ -64,7 +63,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
       emb_dim = cfg['seq2seq']['EMB_DIM']
       dropout = cfg['seq2seq']['DROPOUT']
       enc_in_lang = submodel.cfg['seq2seq']['model_lang']['out_lang']
-      if self.verbose: print('submodel in_lang', enc_in_lang)
+      print('submodel in_lang', enc_in_lang)
       self.piv_langs.append(submodel.cfg['seq2seq']['model_lang']['out_lang'])
       self.add_module(f'enc_{i}', EncoderRNN(cfg['seq2seq'][f'{enc_in_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout))
       self.add_module(f'attn_{i}', AttentionRNN(hid_dim, hid_dim))
