@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 from .seq2seq import Seq2SeqRNN
 from .model_utils import init_weights
-from .seq2seq_Trans import Seq2SeqTransformer
+from .seq2seq_trans import Seq2SeqTransformer
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 

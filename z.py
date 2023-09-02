@@ -8,6 +8,7 @@ from utils import util
 S = 5
 T = 3
 N = 4
+E = 16
 
 x1 = torch.ones(S, N)
 x2 = torch.ones(T, N) * 2

@@ -103,13 +103,13 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 
 #%% LOAD model
 # Seq2Seq
-model_langs = ['en', 'fr']
-model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
-model.apply(init_weights)
+# model_langs = ['en', 'fr']
+# model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+# model.apply(init_weights)
 
 # Seq2Seq_Trans
-# model_langs = ['en', 'fr']
-# model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+model_langs = ['en', 'fr']
+model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 
 # Piv
 # model_langs = ['en', 'fr', 'fr', 'en']
@@ -132,7 +132,7 @@ model.apply(init_weights)
 
 #%%
 
-load_model(model, 'saved/Trans_en-fr_test_1/ckpt_bestValid.pt')
+load_model(model, './saved/Trans_en-fr_en-it-fr_time_0/ckpt_bestValid.pt')
 model_cfg = model.cfg
 if master_process: print('LOADED model')
 if master_process: print(model_cfg)
@@ -142,10 +142,15 @@ if master_process: print(model_cfg)
 src_lang = 'en'
 trg_lang = 'fr'
 # by sent
-example_idx = 12
-src = vars(test_dt.examples[example_idx])[src_lang]
-trg = vars(test_dt.examples[example_idx])[trg_lang]
-pred = translate_sentence(src, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], model, model_cfg, device, src_lang, trg_lang)
+example_idx = 0
+src = vars(train_dt.examples[example_idx])[src_lang]
+trg = vars(train_dt.examples[example_idx])[trg_lang]
+if isinstance(model, Seq2SeqTransformer):
+  model.verbose = True
+  res = model.translate([src], tkzer_dict, FIELD_DICT)
+  pred = res['results']
+else:
+  pred = translate_sentence(src, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], model, model_cfg, device, src_lang, trg_lang)
 print(src)
 print(trg)
 print(pred)

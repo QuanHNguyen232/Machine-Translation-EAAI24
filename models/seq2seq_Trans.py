@@ -47,7 +47,7 @@ class TokenEmbedding(nn.Module):
 
 # Seq2Seq Network 
 class Seq2SeqTransformer(nn.Module):
-    def __init__(self, cfg, in_lang, out_lang, src_pad_idx, device):
+    def __init__(self, cfg, in_lang, out_lang, src_pad_idx, device, verbose=False):
                 #  num_encoder_layers: int,
                 #  num_decoder_layers: int,
                 #  emb_size: int,
@@ -75,6 +75,7 @@ class Seq2SeqTransformer(nn.Module):
         self.dropout = cfg['seq2seq']['TRANS_DROPOUT']
         self.src_pad_idx = src_pad_idx
         self.device = device
+        self.verbose = verbose
 
         self.transformer = Transformer(d_model=self.emb_size,
                                        nhead=self.nhead,
@@ -99,9 +100,8 @@ class Seq2SeqTransformer(nn.Module):
         trg_in = trg[:-1, :]
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = self.create_mask(src, trg_in)
         memory_key_padding_mask = src_padding_mask
-        for i in range(src.shape[1]):
-            print('src', src[:, i])
-            print('src_mask', src_mask[i])
+        if self.verbose: print('src', src[:, 0])
+        if self.verbose: print('src_mask', src_mask[0])
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg_in))
         outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None, 
@@ -110,7 +110,6 @@ class Seq2SeqTransformer(nn.Module):
         # outs.shape = [seq_len, batch_size, dim_feedforward]
 
         logits = self.generator(outs)
-        
         # x = self.encode_train(src, trg)
         # logits = self.decode_train(**x)
 
@@ -160,12 +159,12 @@ class Seq2SeqTransformer(nn.Module):
         logits = self.generator(outs)
         return logits
 
-
     def encode(self, src: Tensor, src_mask: Tensor):
-        # return: memory.shape = [seq_len, batch, emb_size]
+        # return: memory.shape = (S, N, E)
         return self.transformer.encoder(self.positional_encoding(self.src_tok_emb(src)), src_mask)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
+        # return out.shape = (T, N, E)
         return self.transformer.decoder(self.positional_encoding(self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
     def generate_square_subsequent_mask(self, sz):
@@ -179,6 +178,16 @@ class Seq2SeqTransformer(nn.Module):
         return loss
 
     def create_mask(self, src, tgt):
+        '''
+        src = (S, N)
+        trg = (T, N)
+
+        src_mask = (S, S)
+        tgt_mask = (T, T)
+
+        src_padding_mask = (N, S)
+        tgt_padding_mask = (N, T)
+        '''
         src_seq_len = src.shape[0]
         tgt_seq_len = tgt.shape[0]
 
@@ -197,40 +206,117 @@ class Seq2SeqTransformer(nn.Module):
           batch[model_cfg['seq2seq']['model_lang']['in_lang']],
           batch[model_cfg['seq2seq']['model_lang']['out_lang']]
         )
-
+    
     def greedy_decode(self, src, src_mask, max_len, start_symbol):
+        # src.shape = (S, N)
+        # src_mask.shape = (S, S)
         src, src_mask = src.to(self.device), src_mask.to(self.device)
-
-        memory = self.encode(src, src_mask)
-        print('src.shape', src.shape, 'src_mask.shape', src_mask.shape, 'memory.shape', memory.shape)
-        ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(self.device)
+        batch_size = src.shape[1]
+        memory = self.encode(src, src_mask) # memory.shape = (S, N, E)
+        ys = torch.ones(1, batch_size).fill_(start_symbol).type(torch.long).to(self.device)
         for i in range(max_len-1):
-            memory = memory.to(self.device)
+            memory = memory.to(self.device) # memory.shape = (S, N, E)
             tgt_mask = (self.generate_square_subsequent_mask(ys.size(0)).type(torch.bool)).to(self.device)
-            out = self.decode(ys, memory, tgt_mask)
-            out = out.transpose(0, 1)
-            prob = self.generator(out[:, -1])
-            _, next_word = torch.max(prob, dim=1)
-            next_word = next_word.item()
+            out = self.decode(ys, memory, tgt_mask) # out.shape = (T, N, E)
+            out = out.transpose(0, 1) # out.shape = (N, T, E)
+            # out[:, -1, :].shape = (N, E) (take last token)
+            prob = self.generator(out[:, -1, :]) # shape = (N, out_dim)
+            next_word = torch.argmax(prob, dim=1) # shape = (N)
+            ys = torch.cat((ys, next_word.unsqueeze(0).type_as(src.data)), dim=0)
+            # https://stackoverflow.com/questions/61101919/how-can-i-add-an-element-to-a-pytorch-tensor-along-a-certain-dimension
+        return ys # shape = (T, N)
 
-            ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
-            if next_word == EOS_ID: break
-        return ys
-
-    # actual function to translate input sentence into target language
-    def translate(self, src_sentence: str, tkzer_dict, field_dict):
-        # FOR INFERENCE
+    def translate(self, src_sentences, tkzer_dict, field_dict):
         self.eval()
         tkzer_src = tkzer_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
         field_src = field_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
         field_trg = field_dict[self.cfg['seq2seq']['model_lang']['out_lang']]
-        # src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
-        src, src_len_tensor = sent2tensor(tkzer_src, field_src, field_trg, self.device, 64, src_sentence)
-
+        sents = []
+        for src_sentence in src_sentences:
+            src_, _ = sent2tensor(tkzer_src, field_src, field_trg, self.device, 64, src_sentence)
+            sents.append(src_) # src_sent = (S, 1) -> pad = (S, N, 1)
+        src = torch.nn.utils.rnn.pad_sequence(sents, padding_value=PAD_ID).squeeze(2) # shape = (S, N)
         num_tokens = src.shape[0]
         src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-        tgt_tokens = self.greedy_decode(src, src_mask, max_len=num_tokens + 5, start_symbol=SOS_ID).flatten()
-        # return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
-        results = idx2sent(field_trg, tgt_tokens.unsqueeze(1))[0]
-        # results = ' '.join(results).replace("<sos>", "").replace("<eos>", "").split()
+        tgt_tokens = self.greedy_decode(src, src_mask, num_tokens+5, SOS_ID) # shape = (T, N)
+        tgt_tokens, _ = self.process_output(tgt_tokens)
+        results = idx2sent(field_trg, tgt_tokens)
         return {'results': results, 'tokens': tgt_tokens}
+    
+    def process_output(self, output):
+        # output = [trg len, batch size, output dim]
+        # trg = [trg len, batch size]
+        # Process output1 to be input for 
+        if output.ndim == 3:
+            seq_len, N, _ = output.shape
+            tmp_out = output.argmax(2)  # tmp_out = [seq_len, batch_size]
+        else:
+            seq_len, N = output.shape
+            tmp_out = output
+        # re-create pivot as src for model2
+        piv = torch.zeros_like(tmp_out).type(torch.long).to(output.device)
+        piv[0, :] = torch.full_like(piv[0, :], SOS_ID)  # fill all first idx with sos_token
+
+        for i in range(1, seq_len):  # for each i in seq_len
+            # if tmp_out's prev is eos_token, replace w/ pad_token, else current value
+            eos_mask = (tmp_out[i-1, :] == EOS_ID)
+            piv[i, :] = torch.where(eos_mask, PAD_ID, tmp_out[i, :])
+            # if piv's prev is pad_token, replace w/ pad_token, else current value
+            pad_mask = (piv[i-1, :] == PAD_ID)
+            piv[i, :] = torch.where(pad_mask, PAD_ID, piv[i, :])
+
+        # Trim down extra pad tokens
+        tensor_list = [piv[i] for i in range(seq_len) if not all(piv[i] == PAD_ID)]  # tensor_list = [new_seq_len, batch_size]
+        piv = torch.stack([x for x in tensor_list], dim=0).type(torch.long).to(output.device)
+        assert not all(piv[-1] == PAD_ID), 'Not completely trim down tensor'
+
+        # get seq_id + eos_tok id of each sequence
+        piv_ids, eos_ids = (piv.permute(1, 0) == EOS_ID).nonzero(as_tuple=True)  # piv_len = [N]
+        piv_len = torch.full_like(piv[0], seq_len).type(torch.long)  # init w/ longest seq
+        piv_len[piv_ids] = eos_ids + 1 # seq_len = eos_tok + 1
+
+        return piv, piv_len
+    
+    
+    # def greedy_decode(self, src, src_mask, max_len, start_symbol):
+    #     # src.shape = (S, 1) as (S, N)
+    #     # src_mask.shape = (S, S)
+    #     src, src_mask = src.to(self.device), src_mask.to(self.device)
+    #     memory = self.encode(src, src_mask) # memory.shape = (S, 1, E) as (S, N, E)
+    #     if self.verbose: print('greedy_decode:', 'src.shape', src.shape, 'src_mask.shape', src_mask.shape, 'memory.shape', memory.shape)
+    #     ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(self.device) # ys.shape = (1, 1) as (1, N)
+    #     if self.verbose: print('greedy_decode: ys', ys)
+    #     for i in range(max_len-1):
+    #         memory = memory.to(self.device) # memory.shape = (S, 1, E) as N=1
+    #         tgt_mask = (self.generate_square_subsequent_mask(ys.size(0)).type(torch.bool)).to(self.device)
+    #         if self.verbose: print(f'greedy_decode: memory.shape: {memory.shape}\ttgt_mask.shape: {tgt_mask.shape}')
+    #         out = self.decode(ys, memory, tgt_mask) # out.shape = (1, 1, E) as (T, N, E)
+    #         out = out.transpose(0, 1) # out.shape = (1, 1, E) as (N, T, E)
+    #         if self.verbose: print(f'greedy_decode: out.shape: {out.shape}\texpect: (T,N,E) --> (N,T,E)')
+    #         prob = self.generator(out[:, -1, :]) # prob.shape = (1, out_dim) as (N, out_dim)
+    #         if self.verbose: print(f'greedy_decode: pred prob.shape: {prob.shape}\texpect: (N, T, out_dim)')
+    #         _, next_word = torch.max(prob, dim=1)
+    #         next_word = next_word.item()
+    #         ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
+    #         if next_word == EOS_ID: break
+    #     if self.verbose: print(f'greedy_decode: final ys.shape: {ys.shape}')
+    #     return ys # ys.shape = (T, 1) as (T, N)
+
+    # # actual function to translate input sentence into target language
+    # def translate(self, src_sentence: str, tkzer_dict, field_dict):
+    #     # FOR INFERENCE
+    #     self.eval()
+    #     tkzer_src = tkzer_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
+    #     field_src = field_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
+    #     field_trg = field_dict[self.cfg['seq2seq']['model_lang']['out_lang']]
+    #     # src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
+    #     src, src_len_tensor = sent2tensor(tkzer_src, field_src, field_trg, self.device, 64, src_sentence)
+    #     # src.shape = (S, 1)
+    #     if self.verbose: print(f'translate: src.shape: {src.shape}, src: {src}')
+    #     num_tokens = src.shape[0]
+    #     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
+    #     tgt_tokens = self.greedy_decode(src, src_mask, max_len=num_tokens + 5, start_symbol=SOS_ID).flatten()
+    #     # return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
+    #     results = idx2sent(field_trg, tgt_tokens.unsqueeze(1))[0]
+    #     # results = ' '.join(results).replace("<sos>", "").replace("<eos>", "").split()
+    #     return {'results': results, 'tokens': tgt_tokens}

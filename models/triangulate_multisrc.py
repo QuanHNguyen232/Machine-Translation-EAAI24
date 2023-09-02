@@ -11,61 +11,61 @@ import random
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.nn import Transformer
 
-from .seq2seq_Trans import Seq2SeqTransformer
+from .networks import EncoderRNN, AttentionRNN, DecoderRNN
+from .seq2seq import Seq2SeqRNN
 from .model_utils import init_weights
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
-class PivotSeq2SeqMultiSrc(nn.Module):
-  def __init__(self, cfg, models: list, device):
-    super().__init__()
-
 class TriangSeq2SeqMultiSrc(nn.Module):
-  def __init__(self, cfg, models: list, device):
+  def __init__(self, cfg, models: list, device, verbose=False):
     super().__init__()
     # output_dim = trg vocab size
     super().__init__()
     self.cfg = copy.deepcopy(cfg)
     self.cfg.pop('seq2seq', '')
     self.cfg.pop('piv', '')
-    self.cfg['model_id'] = self.modelname = 'triMultiSrcTrans_' + cfg['model_id']
+    self.cfg['model_id'] = self.modelname = 'triMultiSrc_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
 
     self.is_train_backbone = cfg['tri']['is_train_backbone']
     self.out_lang = 'fr'
     self.output_dim = cfg['seq2seq']['fr_DIM']
-    self.device = device
 
+    self.device = device
+    self.verbose = verbose
     self.num_model = len(models)
     self.submodels = []
     self.piv_langs = []
     self.add_submodels(models, cfg)
-    # self.decoder = DecoderRNN(self.output_dim, cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
-    # self.fc = nn.Linear(cfg['seq2seq']['HID_DIM'] * (self.num_model + 1), cfg['seq2seq']['HID_DIM'])
-
-    
+    self.decoder = DecoderRNN(self.output_dim, cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
+    self.fc = nn.Linear(cfg['seq2seq']['HID_DIM'] * (self.num_model + 1), cfg['seq2seq']['HID_DIM'])
 
     # os.makedirs(self.save_dir, exist_ok=True)
     # self.apply(init_weights)
 
   def add_submodels(self, models: list, cfg):
     for i, submodel in enumerate(models):
-        # validity check
-        assert isinstance(submodel, Seq2SeqTransformer), f'{type(submodel)} != Seq2SeqTransformer'
-        # add submodel
-        for param in submodel.parameters():
-            param.requires_grad = self.is_train_backbone
+      # validity check
+      assert isinstance(submodel, Seq2SeqRNN), f'{type(submodel)} != Seq2SeqRNN'
+      # add submodel
+      for param in submodel.parameters():
+        param.requires_grad = self.is_train_backbone
 
-        self.submodels.append(submodel)
-        self.cfg['tri'][f'model_{i}'] = submodel.cfg
-        enc_in_lang = submodel.cfg['seq2seq']['model_lang']['out_lang']
-        print('submodel in_lang', enc_in_lang)
-        self.piv_langs.append(submodel.cfg['seq2seq']['model_lang']['out_lang'])
-        self.add_module(f'enc_{i}', Seq2SeqTransformer(cfg, enc_in_lang, 'fr', PAD_ID, self.device))
+      self.submodels.append(submodel)
+      self.cfg['tri'][f'model_{i}'] = submodel.cfg
+      hid_dim = cfg['seq2seq']['HID_DIM']
+      emb_dim = cfg['seq2seq']['EMB_DIM']
+      dropout = cfg['seq2seq']['DROPOUT']
+      enc_in_lang = submodel.cfg['seq2seq']['model_lang']['out_lang']
+      print('submodel in_lang', enc_in_lang)
+      self.piv_langs.append(submodel.cfg['seq2seq']['model_lang']['out_lang'])
+      self.add_module(f'enc_{i}', EncoderRNN(cfg['seq2seq'][f'{enc_in_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout))
+      self.add_module(f'attn_{i}', AttentionRNN(hid_dim, hid_dim))
     # for ENG
-    self.add_module(f'enc_en', Seq2SeqTransformer(cfg, 'en', 'fr', PAD_ID, self.device))
+    self.add_module(f'enc_en', EncoderRNN(cfg['seq2seq']['en_DIM'], emb_dim, hid_dim, hid_dim, dropout))
+    self.add_module(f'attn_en', AttentionRNN(hid_dim, hid_dim))
 
   def create_mask(self, src):
     mask = (src != PAD_ID).permute(1, 0)
@@ -77,10 +77,10 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     if criterion != None:
       total_loss = self.compute_submodels_loss(loss_list) + self.compute_final_pred_loss(final_out, batch[self.out_lang], criterion)
       total_loss /= (len(loss_list) + 1)
-      print('TriangSeq2SeqMultiSrc FORWARD')
+      if self.verbose: print('TriangSeq2SeqMultiSrc FORWARD')
       return total_loss, final_out, None
     else:
-      print('TriangSeq2SeqMultiSrc FORWARD')
+      if self.verbose: print('TriangSeq2SeqMultiSrc FORWARD')
       return final_out, None
 
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
@@ -92,6 +92,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
       # GET MODEL
       submodel = self.submodels[i] # getattr(self, f'model_{i}')
       submodel_cfg = model_cfg['tri'][f'model_{i}']
+      if self.verbose: print('run: get:', f'model_{i}')
       # FORWARD MODEL
       output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
 
@@ -100,7 +101,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
         output_list.append(output[1])
       else:
         output_list.append(output[0])
-    print('TriangSeq2SeqMultiSrc RUN')
+    if self.verbose: print('TriangSeq2SeqMultiSrc RUN')
     return loss_list, output_list
 
   def compute_submodels_loss(self, loss_list):
@@ -118,10 +119,15 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     loss = criterion(output, trg)
     return loss
 
-  def get_encOut_hid(self, encname, src, trg):
+  def get_encOut_hid(self, encname, src, src_len):
+    # SORT: prep input for encoder
+    sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
+    src, src_len = src[:, sort_ids], src_len[sort_ids]
     # for each output, feed through enc to get enc_output, hidden
-    print('get_encOut_hid get encname', encname)
-    encoder_output, hidden = getattr(self, encname).encode_train(src, trg)
+    if self.verbose: print('get_encOut_hid get encname', encname)
+    encoder_output, hidden = getattr(self, encname)(src, src_len)
+    # UNSORT
+    encoder_output, hidden = encoder_output[:, unsort_ids, :], hidden[unsort_ids, :]
     return encoder_output, hidden
 
   def get_final_pred(self, batch, output_list, teacher_forcing_ratio):
@@ -133,16 +139,19 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     trg_vocab_size = self.decoder.output_dim
 
     attn_models = [getattr(self, f'attn_{i}') for i in range(self.num_model)] + [getattr(self, 'attn_en')]
+    if self.verbose: print('get_final_pred: get attn_models')
     encoder_outputs, hiddens, masks = [], [], []
     for i, output in enumerate(output_list):
-      print('get_final_pred lang =', self.piv_langs[i])
+      if self.verbose: print('get_final_pred lang =', self.piv_langs[i])
       src, src_len = batch[self.piv_langs[i]] if random.random() < teacher_forcing_ratio else self.process_output(output)
-      encoder_output, hidden = self.get_encOut_hid(f'enc_{i}', src, ?)
+      encoder_output, hidden = self.get_encOut_hid(f'enc_{i}', src, src_len)
       # add to list
       masks.append(self.create_mask(src))
       encoder_outputs.append(encoder_output) #encoder_output = [src len, batch size, enc hid dim * 2]
+      hiddens.append(hidden) #hidden = [batch size, dec hid dim]
     # FOR ENG
-    encoder_output, hidden = self.get_encOut_hid(f'enc_en', en_tensor, ?)
+    if self.verbose: print('get_final_pred lang = en')
+    encoder_output, hidden = self.get_encOut_hid(f'enc_en', en_tensor, en_tensor_len)
     masks.append(self.create_mask(en_tensor))
     encoder_outputs.append(encoder_output) #encoder_output = [src len, batch size, enc hid dim * 2]
     hiddens.append(hidden) #hidden = [batch size, dec hid dim]
@@ -150,13 +159,14 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     # combine hidden by mean
     input_hidden = torch.tanh(self.fc(torch.cat(hiddens, dim=1))) # Multi-src Neural Translation by Zoph & Knight
     # input_hidden = torch.mean(torch.stack(hiddens, dim=0), dim=0) #input_hidden = [batch size, dec hid dim]
+    if self.verbose: print('get_final_pred: Combine Hiddens')
 
     #tensor to store decoder outputs
     outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
 
     # prep for Decoder: (input, hidden, encoder_outputs: list, masks: list, attn_models: list)
     input = trg[0,:] #first input to the decoder is the <sos> tokens
-    print('multi-src', f'len(encoder_outputs)={len(encoder_outputs)}', f'len(masks)={len(masks)}', f'len(attn_models)={len(attn_models)}')
+    if self.verbose: print('get_final_pred', f'len(encoder_outputs)={len(encoder_outputs)}', f'len(masks)={len(masks)}', f'len(attn_models)={len(attn_models)}')
     for t in range(1, trg_len):
       #insert input token embedding, previous hidden state, all encoder hidden states and mask
       #receive output tensor (predictions) and new hidden state
@@ -167,7 +177,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
 
       #if teacher forcing, use actual next token as next input. Else, use predicted token
       input = trg[t] if random.random() < teacher_forcing_ratio else output.argmax(1)
-    print('TriangSeq2SeqMultiSrc get_final_pred_')
+    if self.verbose: print('TriangSeq2SeqMultiSrc get_final_pred_')
     return outputs
 
   def sort_by_sent_len(self, sent_len):
