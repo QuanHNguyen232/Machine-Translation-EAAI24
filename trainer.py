@@ -22,7 +22,7 @@ from torchtext.data import Dataset, Example
 
 # from dataset import get_dataset_dataloader
 from dataset import get_tkzer_dict, get_field_dict
-from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
+from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq, TriangSeq2SeqMultiSrc, Seq2SeqTransformer
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from utils import util
@@ -96,28 +96,40 @@ for lang in langs:
 
 # train_set, train_iterator = get_dataset_dataloader(data[: train_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], True)
 # valid_set, valid_iterator = get_dataset_dataloader(data[train_pt:valid_pt], langs, 'en', cfg['BATCH_SIZE'], True, device, cfg['use_DDP'], False)
-if master_process: (len(train_iterator), len(valid_iterator), len(test_iterator))
+if master_process: print(len(train_iterator), len(valid_iterator), len(test_iterator))
 
 #%% LOAD model
 
 # cfg['model_id'] = '?'
 
 # Seq2Seq
+# model_langs = ['en', 'fr']
+# model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+# model.apply(init_weights)
+
+# Seq2Seq_Trans
+# cfg, in_lang, out_lang, src_pad_idx, device
 model_langs = ['en', 'fr']
-model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
-model.apply(init_weights)
+model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+
 # Piv
 # model_langs = ['en', 'fr', 'fr', 'en']
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[2], out_lang=model_langs[3], src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model.apply(init_weights)
+
 # Tri
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
+
+# Multi-Src
+# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
+# model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
+# model.apply(init_weights)
 
 model_cfg = model.cfg
 save_cfg(model_cfg)
@@ -130,6 +142,8 @@ if cfg['use_DDP']:
 
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
 optimizer = optim.Adam(model.parameters(), lr=model_cfg['LR'])
+if isinstance(model, Seq2SeqTransformer):
+  optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
 scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(ratio*model_cfg['NUM_ITERS']) for ratio in model_cfg['scheduler']['milestones']], gamma=model_cfg['scheduler']['gamma'])
 if master_process: print(scheduler.get_last_lr())
 

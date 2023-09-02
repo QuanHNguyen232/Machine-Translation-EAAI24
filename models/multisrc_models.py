@@ -42,11 +42,12 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     self.piv_langs = []
     self.add_submodels(models, cfg)
     self.decoder = DecoderRNN(self.output_dim, cfg['seq2seq']['EMB_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['HID_DIM'], cfg['seq2seq']['DROPOUT'])
+    self.fc = nn.Linear(cfg['seq2seq']['HID_DIM'] * (self.num_model + 1), cfg['seq2seq']['HID_DIM'])
 
     self.device = device
 
     # os.makedirs(self.save_dir, exist_ok=True)
-    self.apply(init_weights)
+    # self.apply(init_weights)
 
   def add_submodels(self, models: list, cfg):
     for i, submodel in enumerate(models):
@@ -61,10 +62,14 @@ class TriangSeq2SeqMultiSrc(nn.Module):
       hid_dim = cfg['seq2seq']['HID_DIM']
       emb_dim = cfg['seq2seq']['EMB_DIM']
       dropout = cfg['seq2seq']['DROPOUT']
-      in_lang = submodel.cfg['seq2seq']['model_lang']['in_lang']
+      enc_in_lang = submodel.cfg['seq2seq']['model_lang']['out_lang']
+      print('submodel in_lang', enc_in_lang)
       self.piv_langs.append(submodel.cfg['seq2seq']['model_lang']['out_lang'])
-      self.add_module(f'enc_{i}', EncoderRNN(cfg['seq2seq'][f'{in_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout))
+      self.add_module(f'enc_{i}', EncoderRNN(cfg['seq2seq'][f'{enc_in_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout))
       self.add_module(f'attn_{i}', AttentionRNN(hid_dim, hid_dim))
+    # for ENG
+    self.add_module(f'enc_en', EncoderRNN(cfg['seq2seq'][f'en_DIM'], emb_dim, hid_dim, hid_dim, dropout))
+    self.add_module(f'attn_en', AttentionRNN(hid_dim, hid_dim))
 
   def create_mask(self, src):
     mask = (src != PAD_ID).permute(1, 0)
@@ -76,8 +81,10 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     if criterion != None:
       total_loss = self.compute_submodels_loss(loss_list) + self.compute_final_pred_loss(final_out, batch[self.out_lang], criterion)
       total_loss /= (len(loss_list) + 1)
+      print('TriangSeq2SeqMultiSrc FORWARD')
       return total_loss, final_out, None
     else:
+      print('TriangSeq2SeqMultiSrc FORWARD')
       return final_out, None
 
   def run(self, batch, model_cfg, criterion, teacher_forcing_ratio):
@@ -97,7 +104,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
         output_list.append(output[1])
       else:
         output_list.append(output[0])
-
+    print('TriangSeq2SeqMultiSrc RUN')
     return loss_list, output_list
 
   def compute_submodels_loss(self, loss_list):
@@ -115,37 +122,51 @@ class TriangSeq2SeqMultiSrc(nn.Module):
     loss = criterion(output, trg)
     return loss
 
+  def get_encOut_hid(self, encname, src, src_len):
+    # SORT: prep input for encoder
+    sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
+    src, src_len = src[:, sort_ids], src_len[sort_ids]
+    # for each output, feed through enc to get enc_output, hidden
+    print('get_encOut_hid get encname', encname)
+    encoder_output, hidden = getattr(self, encname)(src, src_len)
+    # UNSORT
+    encoder_output, hidden = encoder_output[:, unsort_ids, :], hidden[unsort_ids, :]
+    return encoder_output, hidden
+
   def get_final_pred(self, batch, output_list, teacher_forcing_ratio):
     # SIMILAR TO Seq2Seq's decoding step
     # output_list[0] shape = [seq_len, N, out_dim], each output is in a language
+    en_tensor, en_tensor_len = batch['en']
     (trg, _) = batch[self.out_lang]
     trg_len, batch_size = trg.shape
     trg_vocab_size = self.decoder.output_dim
 
-    attn_models = [getattr(self, f'attn_{i}') for i in range(self.num_model)]
+    attn_models = [getattr(self, f'attn_{i}') for i in range(self.num_model)] + [getattr(self, 'attn_en')]
     encoder_outputs, hiddens, masks = [], [], []
     for i, output in enumerate(output_list):
+      print('get_final_pred lang =', self.piv_langs[i])
       src, src_len = batch[self.piv_langs[i]] if random.random() < teacher_forcing_ratio else self.process_output(output)
-      # SORT: prep input for encoder
-      sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
-      src, src_len = src[:, sort_ids], src_len[sort_ids]
-      # for each output, feed through enc to get enc_output, hidden
-      encoder_output, hidden = getattr(self, f'enc_{i}')(src, src_len)
-      # UNSORT
-      encoder_output, hidden = encoder_output[:, unsort_ids, :], hidden[unsort_ids, :]
+      encoder_output, hidden = self.get_encOut_hid(f'enc_{i}', src, src_len)
       # add to list
+      masks.append(self.create_mask(src))
       encoder_outputs.append(encoder_output) #encoder_output = [src len, batch size, enc hid dim * 2]
       hiddens.append(hidden) #hidden = [batch size, dec hid dim]
+    # FOR ENG
+    encoder_output, hidden = self.get_encOut_hid(f'enc_en', en_tensor, en_tensor_len)
+    masks.append(self.create_mask(en_tensor))
+    encoder_outputs.append(encoder_output) #encoder_output = [src len, batch size, enc hid dim * 2]
+    hiddens.append(hidden) #hidden = [batch size, dec hid dim]
 
     # combine hidden by mean
-    input_hidden = torch.mean(torch.stack(hiddens, dim=0), dim=0)
+    input_hidden = torch.tanh(self.fc(torch.cat(hiddens, dim=1))) # Multi-src Neural Translation by Zoph & Knight
+    # input_hidden = torch.mean(torch.stack(hiddens, dim=0), dim=0) #input_hidden = [batch size, dec hid dim]
 
     #tensor to store decoder outputs
     outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
 
     # prep for Decoder: (input, hidden, encoder_outputs: list, masks: list, attn_models: list)
     input = trg[0,:] #first input to the decoder is the <sos> tokens
-
+    print('multi-src', f'len(encoder_outputs)={len(encoder_outputs)}', f'len(masks)={len(masks)}', f'len(attn_models)={len(attn_models)}')
     for t in range(1, trg_len):
       #insert input token embedding, previous hidden state, all encoder hidden states and mask
       #receive output tensor (predictions) and new hidden state
@@ -156,7 +177,7 @@ class TriangSeq2SeqMultiSrc(nn.Module):
 
       #if teacher forcing, use actual next token as next input. Else, use predicted token
       input = trg[t] if random.random() < teacher_forcing_ratio else output.argmax(1)
-
+    print('TriangSeq2SeqMultiSrc get_final_pred_')
     return outputs
 
   def sort_by_sent_len(self, sent_len):

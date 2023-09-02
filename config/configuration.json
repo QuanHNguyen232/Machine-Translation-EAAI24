@@ -2,10 +2,16 @@
     "seq2seq": {
         "EMB_DIM": 256,
         "HID_DIM": 512,
-        "DROPOUT": 0.5
+        "DROPOUT": 0.5,
+        "EMB_SIZE": 512,
+        "NHEAD": 8,
+        "FFN_HID_DIM": 512,
+        "NUM_ENCODER_LAYERS": 3,
+        "NUM_DECODER_LAYERS": 3,
+        "TRANS_DROPOUT": 0.1
     },
     "piv": {
-        "lambda": 0.001,
+        "lambda": 0.0001,
         "is_share_emb": true
     },
     "tri": {
@@ -14,15 +20,15 @@
         "is_train_backbone": true
     },
     "use_DDP": false,
-    "BATCH_SIZE": 16,
+    "BATCH_SIZE": 32,
     "train_len": 64000,
     "valid_len": 6400,
     "test_len": 12800,
     "LR": 0.001,
     "NUM_ITERS": 30000,
     "CLIP": 1.0,
-    "model_id": "test_0",
-    "scheduler": {"milestones": [0.35, 0.6, 0.8] ,"gamma": 0.3333333333333333},
+    "model_id": "test",
+    "scheduler": {"milestones": [0.35, 0.6, 0.9] ,"gamma": 0.3333333333333333},
     "save_dir": "saved/",
     "verbose_interval": 2000,
     "data_path": "data/en-de-fr-it-es-pt-ro_min4-max64_100k.pkl"
