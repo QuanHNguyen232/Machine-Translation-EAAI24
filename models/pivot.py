@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from .seq2seq import Seq2SeqRNN
 from .model_utils import init_weights
+from .seq2seq_Trans import Seq2SeqTransformer
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
@@ -40,8 +41,8 @@ class PivotSeq2Seq(nn.Module):
     # validity check
     for i in range(1, self.num_model):
       assert models[i-1].cfg['seq2seq']['model_lang']['out_lang'] == models[i].cfg['seq2seq']['model_lang']['in_lang']
-      assert isinstance(models[i-1], Seq2SeqRNN), f'{type(models[i-1])} != Seq2SeqRNN'
-      assert isinstance(models[i], Seq2SeqRNN), f'{type(models[i])} != Seq2SeqRNN'
+      assert isinstance(models[i-1], Seq2SeqRNN) or isinstance(models[i-1], Seq2SeqTransformer), type(models[i-1])
+      assert isinstance(models[i], Seq2SeqRNN) or isinstance(models[i], Seq2SeqTransformer), type(models[i])
     # add submodel
     for i, submodel in enumerate(models):
       self.add_module(f'model_{i}', submodel)
@@ -51,7 +52,10 @@ class PivotSeq2Seq(nn.Module):
     for i in range(1, self.num_model):
       prev_model = getattr(self, f'model_{i-1}')
       curr_model = getattr(self, f'model_{i}')
-      curr_model.encoder.embedding = prev_model.decoder.embedding
+      if isinstance(prev_model, Seq2SeqTransformer) and isinstance(curr_model, Seq2SeqTransformer):
+        prev_model.tgt_tok_emb.embedding = curr_model.src_tok_emb.embedding
+      else:
+        curr_model.encoder.embedding = prev_model.decoder.embedding
 
   def forward(self, batch, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     loss_list, output_list = self.run(batch, model_cfg, criterion, teacher_forcing_ratio)

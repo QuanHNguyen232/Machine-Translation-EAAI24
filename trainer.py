@@ -182,6 +182,12 @@ for epoch in range(num_epochs):
       train_log = []
       print('update_trainlog SUCCESS')
 
+  if isinstance(model, Seq2SeqTransformer):
+    src = vars(valid_dt.examples[0])[model_langs[0]]
+    trg = vars(valid_dt.examples[0])[model_langs[1]]
+    res = model.translate(src, tkzer_dict[model_langs[0]], FIELD_DICT[model_langs[0]], FIELD_DICT[model_langs[1]])
+    print(f'{src}\n{trg}\n{res}')
+  
   if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
 
   if not isContinue:
