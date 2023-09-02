@@ -1,5 +1,9 @@
 # https://www.kaggle.com/code/latinchakma/transformer-based-seq2seq-de-to-en-multi30k
 # check hq.nguyen1115@gmail.com for latest ver.
+# S is the source sequence length
+# T is the target sequence length
+# N is the batch size
+# E is the feature number
 
 import os
 import math
@@ -86,19 +90,18 @@ class Seq2SeqTransformer(nn.Module):
         self.init_weight()
 
     def init_weight(self):
-      for p in self.parameters():
-        if p.dim() > 1: nn.init.xavier_uniform_(p)
+        for p in self.parameters():
+            if p.dim() > 1: nn.init.xavier_uniform_(p)
 
     def forward(self, batch, model_cfg=None, criterion=None, teacher_forcing_ratio=None):
         (src, _), (trg, _) = self.prep_input(batch, model_cfg)
-        src = src.to(self.device)
-        trg = trg.to(self.device)
-
+        src, trg = src.to(self.device), trg.to(self.device)
         trg_in = trg[:-1, :]
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = self.create_mask(src, trg_in)
-        
-        memory_key_padding_mask = src_padding_mask # OR = NONE ???
-
+        memory_key_padding_mask = src_padding_mask
+        for i in range(src.shape[1]):
+            print('src', src[:, i])
+            print('src_mask', src_mask[i])
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg_in))
         outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None, 
@@ -107,15 +110,59 @@ class Seq2SeqTransformer(nn.Module):
         # outs.shape = [seq_len, batch_size, dim_feedforward]
 
         logits = self.generator(outs)
-        # return logits
+        
+        # x = self.encode_train(src, trg)
+        # logits = self.decode_train(**x)
 
         if criterion != None:
-          loss = self.compute_loss(logits, trg, criterion)
-          return loss, logits, None
+            loss = self.compute_loss(logits, trg, criterion)
+            return loss, logits, None
         return logits, None
+    
+    def encode_train(self, src: Tensor, trg: Tensor):
+        '''
+        src = (S, N)
+        trg = (T, N)
+        src_emb = (S, N, E)
+        tgt_emb = (T, N, E)
+
+        src_mask = (S, S)
+        tgt_mask = (T, T)
+
+        src_padding_mask = (N, S)
+        tgt_padding_mask = (N, T)
+
+        memory = (S, N, E)
+        memory_key_padding_mask = (N, S)
+        '''
+        src, trg = src.to(self.device), trg.to(self.device)
+        trg_in = trg[:-1, :]
+        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = self.create_mask(src, trg_in)
+        
+        memory_key_padding_mask = src_padding_mask
+
+        src_emb = self.positional_encoding(self.src_tok_emb(src))
+        tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg_in))
+
+        memory = self.transformer.encoder(src_emb, mask=src_mask, src_key_padding_mask=src_padding_mask)
+        return {
+            "tgt_emb": tgt_emb,
+            "memory": memory,
+            "tgt_mask": tgt_mask,
+            "tgt_padding_mask": tgt_padding_mask,
+            "memory_key_padding_mask": memory_key_padding_mask
+        }
+    
+    def decode_train(self, tgt_emb, memory, tgt_mask, tgt_padding_mask, memory_key_padding_mask):
+        outs = self.transformer.decoder(tgt_emb, memory, tgt_mask=tgt_mask,
+                              tgt_key_padding_mask=tgt_padding_mask,
+                              memory_key_padding_mask=memory_key_padding_mask)
+        logits = self.generator(outs)
+        return logits
+
 
     def encode(self, src: Tensor, src_mask: Tensor):
-        # return: enc.shape = [seq_len, batch, emb_size]
+        # return: memory.shape = [seq_len, batch, emb_size]
         return self.transformer.encoder(self.positional_encoding(self.src_tok_emb(src)), src_mask)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
@@ -136,7 +183,7 @@ class Seq2SeqTransformer(nn.Module):
         tgt_seq_len = tgt.shape[0]
 
         tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len)
-        src_mask = torch.zeros((src_seq_len, src_seq_len),device=self.device).type(torch.bool)
+        src_mask = torch.zeros((src_seq_len, src_seq_len), device=self.device).type(torch.bool)
 
         src_padding_mask = (src == PAD_ID).transpose(0, 1)
         tgt_padding_mask = (tgt == PAD_ID).transpose(0, 1)
@@ -146,10 +193,6 @@ class Seq2SeqTransformer(nn.Module):
         '''
         batch: dict of langs. each lang is tuple (seq_batch, seq_lens)
         '''
-        # return (
-        # batch[SRC_LANGUAGE],
-        # batch[TGT_LANGUAGE]
-        # )
         return (
           batch[model_cfg['seq2seq']['model_lang']['in_lang']],
           batch[model_cfg['seq2seq']['model_lang']['out_lang']]
@@ -171,13 +214,16 @@ class Seq2SeqTransformer(nn.Module):
             next_word = next_word.item()
 
             ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
-            if next_word == EOS_ID:
-                break
+            if next_word == EOS_ID: break
         return ys
 
     # actual function to translate input sentence into target language
-    def translate(self, src_sentence: str, tkzer_src, field_src, field_trg):
+    def translate(self, src_sentence: str, tkzer_dict, field_dict):
+        # FOR INFERENCE
         self.eval()
+        tkzer_src = tkzer_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
+        field_src = field_dict[self.cfg['seq2seq']['model_lang']['in_lang']]
+        field_trg = field_dict[self.cfg['seq2seq']['model_lang']['out_lang']]
         # src = text_transform[SRC_LANGUAGE](src_sentence).view(-1, 1)
         src, src_len_tensor = sent2tensor(tkzer_src, field_src, field_trg, self.device, 64, src_sentence)
 
@@ -186,5 +232,5 @@ class Seq2SeqTransformer(nn.Module):
         tgt_tokens = self.greedy_decode(src, src_mask, max_len=num_tokens + 5, start_symbol=SOS_ID).flatten()
         # return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
         results = idx2sent(field_trg, tgt_tokens.unsqueeze(1))[0]
-        results = ' '.join(results).replace("<sos>", "").replace("<eos>", "").split()
-        return results
+        # results = ' '.join(results).replace("<sos>", "").replace("<eos>", "").split()
+        return {'results': results, 'tokens': tgt_tokens}

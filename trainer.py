@@ -185,8 +185,9 @@ for epoch in range(num_epochs):
   if isinstance(model, Seq2SeqTransformer):
     src = vars(valid_dt.examples[0])[model_langs[0]]
     trg = vars(valid_dt.examples[0])[model_langs[1]]
-    res = model.translate(src, tkzer_dict[model_langs[0]], FIELD_DICT[model_langs[0]], FIELD_DICT[model_langs[1]])
-    print(f'{src}\n{trg}\n{res}')
+    res = model.translate(src, tkzer_dict, FIELD_DICT)
+    text, toks = res['results'], res['tokens']
+    print(f'{src}\n{trg}\n{text}\n{toks}')
   
   if master_process: print(f'Epoch: {epoch:02} \t Train Loss: {train_loss:.3f} \t Val. Loss: {valid_loss:.3f}')
 

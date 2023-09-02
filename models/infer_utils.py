@@ -29,7 +29,7 @@ def idx2sent(trg_field, arr):
   for i in range(n_sents):  # for each sent
     pred_sent = []
     pred = arr[:, i]
-    for i in pred[1:]:  # for each word
+    for i in pred:  # for each word
       pred_sent.append(trg_field.vocab.itos[i])
       if i == trg_field.vocab.stoi[trg_field.eos_token]: break
     results.append(pred_sent)
