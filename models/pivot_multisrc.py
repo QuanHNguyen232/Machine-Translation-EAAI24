@@ -194,3 +194,104 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     unsort_ids = sort_ids.argsort()
     return sort_ids, unsort_ids
 
+class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
+  # For 1 models only
+  def __init__(self, cfg, submodel, device, verbose=False):
+    super().__init__(cfg, submodel, device, verbose)
+    self.cfg['model_id'] = self.modelname = 'pivMultiSrc_2_' + cfg['model_id']
+
+    self.add_submodel(submodel, cfg)
+  
+  def add_submodel(self, submodel, cfg):
+    hid_dim = cfg['seq2seq']['HID_DIM']
+    emb_dim = cfg['seq2seq']['EMB_DIM']
+    dropout = cfg['seq2seq']['DROPOUT']
+    self.add_module('submodel', submodel) # en -> piv
+    self.cfg['piv']['submodel'] = submodel.cfg
+    self.piv_lang = submodel.cfg['seq2seq']['model_lang']['out_lang']
+    # Encoders:
+    self.piv_enc = EncoderRNN(cfg['seq2seq'][f'{self.piv_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout)
+    self.en_enc = EncoderRNN(cfg['seq2seq']['en_DIM'], emb_dim, hid_dim, hid_dim, dropout)
+    # Attns:
+    self.piv_attn = AttentionRNN(hid_dim, hid_dim)
+    self.en_attn = AttentionRNN(hid_dim, hid_dim)
+    # Decoder:
+    self.decoder = DecoderRNN(self.output_dim, emb_dim, hid_dim, hid_dim, dropout)
+    # Hidden combine
+    self.fc = nn.Linear(hid_dim * 2, hid_dim) # *2: piv and en
+  
+  def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
+    if self.verbose: print('start forward')
+    submodel_loss, submodel_output, material = self.run_submodel(batch, model_cfg, criterion, teacher_forcing_ratio)
+
+    # Run Encoder on PIV
+    encoder_outputs, hiddens, masks = self.run_encoder(batch, submodel_output, teacher_forcing_ratio)
+    if self.verbose: print('\tforward: get piv+en out/hid/mask from run_encoder')
+
+    # Combine
+    attn_models = [self.piv_attn, self.en_attn]
+    hidden = torch.tanh(self.fc(torch.cat(hiddens, dim = 1)))
+    if self.verbose: print('\tforward: combine hidden state')
+
+    # Predict (similar to seq2seq)
+    trg, _ = batch['fr']
+    batch_size = trg.shape[1]
+    trg_len = trg.shape[0]
+    trg_vocab_size = self.decoder.output_dim
+    outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
+    if self.verbose: print('\tforward: start predicting')
+
+    #first input to the decoder is the <sos> tokens
+    input = trg[0,:]
+
+    for t in range(1, trg_len):
+      #insert input token embedding, previous hidden state, all encoder hidden states and mask
+      #receive output tensor (predictions) and new hidden state
+      output, hidden, _ = self.decoder(input, hidden, encoder_outputs, masks, attn_models)
+
+      #place predictions in a tensor holding predictions for each token
+      outputs[t] = output
+
+      #if teacher forcing, use actual next token as next input. Else, use predicted token
+      input = trg[t] if random.random() < teacher_forcing_ratio else output.argmax(1)
+    
+    if criterion != None:
+      pred_loss = self.compute_loss(outputs, trg, criterion)
+      final_loss = (pred_loss + submodel_loss) / 2
+      return final_loss, outputs, None
+    else:
+      return outputs, None
+
+  def run_encoder(self, batch, submodel_output, teacher_forcing_ratio):
+    ''' Run for "piv" and "en" lang
+    '''
+    if self.verbose: print('start run_encoder')
+    enc_out_list, hid_list, mask_list = [], [], []
+    for lang in [self.piv_lang, 'en']:
+      if lang == 'en':
+        src, src_len = batch[lang]
+        if self.verbose: print('\trun_encoder: get src, src_len for en')
+      else:
+        src, src_len = batch[lang] if random.random() < teacher_forcing_ratio else self.process_output(submodel_output)
+        if self.verbose: print('\trun_encoder: get src, src_len for', lang)
+
+      # SORT: prep input for encoder
+      sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
+      src, src_len = src[:, sort_ids], src_len[sort_ids]
+      if self.verbose: print('\trun_encoder: sorted lang for', lang)
+
+      enc = getattr(self, 'en_enc') if lang == 'en' else getattr(self, 'piv_enc')
+      encoder_output, hidden = enc(src, src_len)
+      # UNSORT
+      encoder_output = encoder_output[:, unsort_ids, :] #shape = [src len, batch size, enc hid dim * 2]
+      hidden = hidden[unsort_ids, :] #shape = [batch size, dec hid dim]
+      if self.verbose: print('\trun_encoder: get enc_out, hidden for', lang)
+
+      mask = self.create_mask(src)
+      if self.verbose: print('\trun_encoder: get mask for', lang)
+
+      enc_out_list.append(encoder_output)
+      hid_list.append(hidden)
+      mask_list.append(mask)
+
+    return enc_out_list, hid_list, mask_list

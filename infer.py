@@ -24,7 +24,9 @@ from torchtext.data.metrics import bleu_score
 
 # from dataset import get_dataset_dataloader
 from dataset import get_tkzer_dict, get_field_dict
-from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq, TriangSeq2SeqMultiSrc, Seq2SeqTransformer
+from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
+from models import Seq2SeqTransformer
+from models import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2, TriangSeq2SeqMultiSrc
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from models import translate_sentence, translate_batch, calculate_bleu_batch
@@ -108,17 +110,26 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 # model.apply(init_weights)
 
 # Seq2Seq_Trans
-model_langs = ['en', 'fr']
-model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
+# model_langs = ['en', 'fr']
+# model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 
 # Piv
+# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
 # model_langs = ['en', 'fr', 'fr', 'en']
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[2], out_lang=model_langs[3], src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model.apply(init_weights)
 
+# Piv Multi-Src
+cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
+# model = PivotSeq2SeqMultiSrc(cfg=cfg, submodel=model_0, device=device).to(device)
+model = PivotSeq2SeqMultiSrc_2(cfg=cfg, submodel=model_0, device=device).to(device)
+model.apply(init_weights)
+
 # Tri
+# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
@@ -126,7 +137,8 @@ model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
 
 # Multi-Src
-# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
+# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
 # model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
 # model.apply(init_weights)
 
@@ -165,5 +177,5 @@ print(bleu_score([pred], [[trg]]))
 #   if i==3: break
 
 # calc bleu
-# calculate_bleu_batch(model, model_cfg, test_iterator, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], device, src_lang, trg_lang)
+calculate_bleu_batch(model, model_cfg, test_iterator, tkzer_dict[src_lang], FIELD_DICT[src_lang], FIELD_DICT[trg_lang], device, src_lang, trg_lang)
 

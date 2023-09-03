@@ -11,7 +11,7 @@ from .seq2seq_trans import Seq2SeqTransformer
 
 from .pivot import PivotSeq2Seq
 from .pivot_trans import PivotTrans
-from .pivot_multisrc import PivotSeq2SeqMultiSrc
+from .pivot_multisrc import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2
 
 from .triangulate import TriangSeq2Seq
 from .triangulate_multisrc import TriangSeq2SeqMultiSrc

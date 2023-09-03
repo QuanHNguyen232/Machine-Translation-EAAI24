@@ -24,7 +24,7 @@ from torchtext.data import Dataset, Example
 from dataset import get_tkzer_dict, get_field_dict
 from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
 from models import Seq2SeqTransformer
-from models import PivotSeq2SeqMultiSrc, TriangSeq2SeqMultiSrc
+from models import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2, TriangSeq2SeqMultiSrc
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
 from models import train_epoch, eval_epoch
 from utils import util
@@ -122,7 +122,8 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 # Piv Multi-Src
 cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
 model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
-model = PivotSeq2SeqMultiSrc(cfg=cfg, submodel=model_0, device=device).to(device)
+# model = PivotSeq2SeqMultiSrc(cfg=cfg, submodel=model_0, device=device).to(device)
+model = PivotSeq2SeqMultiSrc_2(cfg=cfg, submodel=model_0, device=device).to(device)
 model.apply(init_weights)
 
 # Tri
