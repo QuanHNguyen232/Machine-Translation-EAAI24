@@ -25,7 +25,7 @@ from dataset import get_tkzer_dict, get_field_dict
 from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
 from models import Seq2SeqTransformer
 from models import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2, TriangSeq2SeqMultiSrc
-from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model
+from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model, set_model_freeze
 from models import train_epoch, eval_epoch
 from utils import util
 
