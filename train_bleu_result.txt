@@ -21,6 +21,22 @@ piv_en-it-fr_time_0:
     ckpt_bestValid: BLEU score = 20.267
     ckpt_bestTrain: BLEU score = 22.050
 
+pivMultiSrc_en-de-fr_pretrain_time_0:
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 15.519
+
+pivMultiSrc_en-de-fr_time_0:
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 
+
+pivMultiSrc_en-it-fr_pretrain_time_0:
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 11.148
+
+pivMultiSrc_en-it-fr_time_0:
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 19.557
+
 RNN_de-fr_time_1:
     ckpt_bestValid: BLEU score = 
     ckpt_bestTrain: BLEU score = 20.682
@@ -60,3 +76,11 @@ RNN_en-ro_time_0:
 RNN_it-fr_time_1:
     ckpt_bestValid: BLEU score = 
     ckpt_bestTrain: BLEU score = 25.630
+
+triMultiSrc_en-it-fr_time_0:
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 3.563
+
+triMultiSrc_en-it-fr_time_1 (pretrain en-it_time_1):
+    ckpt_bestValid: BLEU score = 
+    ckpt_bestTrain: BLEU score = 3.157
