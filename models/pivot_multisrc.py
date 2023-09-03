@@ -199,7 +199,8 @@ class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
   def __init__(self, cfg, submodel, device, verbose=False):
     super().__init__(cfg, submodel, device, verbose)
     self.cfg['model_id'] = self.modelname = 'pivMultiSrc_2_' + cfg['model_id']
-
+    self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
+    
     self.add_submodel(submodel, cfg)
   
   def add_submodel(self, submodel, cfg):

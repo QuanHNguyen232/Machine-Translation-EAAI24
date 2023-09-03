@@ -146,6 +146,13 @@ if master_process: print('SAVED cfg')
 if master_process: print(model_cfg)
 if cfg['use_DDP']:
   model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank)
+
+#%%
+
+# load_model(model.submodel, '')
+# set_model_freeze(model.submodel, isFreeze=True)
+# print('requires_grad:', any([param.requires_grad for param in model.parameters()]))
+
 #%% LOAD criterion/optim/scheduler
 
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
