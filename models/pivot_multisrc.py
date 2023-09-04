@@ -32,6 +32,8 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     self.verbose = verbose
     self.device = device
     self.add_submodel(submodel, cfg)
+    if self.cfg['piv']['is_share_emb']:
+      self.set_share_emb()
 
   def add_submodel(self, submodel, cfg):
     hid_dim = cfg['seq2seq']['HID_DIM']
@@ -49,7 +51,10 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     self.decoder = DecoderRNN(self.output_dim, emb_dim, hid_dim, hid_dim, dropout)
     # Hidden combine
     self.fc = nn.Linear(hid_dim * 2, hid_dim) # *2: piv and en
-    
+  
+  def set_share_emb(self):
+    self.piv_enc.embedding = getattr(self, 'submodel').decoder.embedding
+
   def create_mask(self, src):
     mask = (src != PAD_ID).permute(1, 0)
     return mask
@@ -202,6 +207,8 @@ class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
     
     self.add_submodel(submodel, cfg)
+    if self.cfg['piv']['is_share_emb']:
+      self.set_share_emb()
   
   def add_submodel(self, submodel, cfg):
     hid_dim = cfg['seq2seq']['HID_DIM']
@@ -221,6 +228,9 @@ class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
     # Hidden combine
     self.fc = nn.Linear(hid_dim * 2, hid_dim) # *2: piv and en
   
+  def set_share_emb(self):
+    self.piv_enc.embedding = getattr(self, 'submodel').decoder.embedding
+
   def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     if self.verbose: print('start forward')
     submodel_loss, submodel_output, material = self.run_submodel(batch, model_cfg, criterion, teacher_forcing_ratio)
