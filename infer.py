@@ -8,6 +8,7 @@ Trainer file
 #%%
 import os
 import sys
+import json
 from datetime import datetime
 from tqdm import tqdm
 
@@ -104,48 +105,56 @@ for lang in langs:
 if master_process: print(len(train_iterator), len(valid_iterator), len(test_iterator))
 
 #%% LOAD model
+
+model_dir = '/Accounts/turing/students/s24/nguyqu03/Quan_dir/EAAI24-NMT/dir_1/Machine-Translation-EAAI24/saved/pivMultiSrc_2_en-de-fr_shared_emb_time_0'
+print('model name:', os.path.basename(model_dir))
+model_cfg = util.load_cfg(os.path.join(model_dir, 'cfg.json'))
+
 # Seq2Seq
+# model_cfg['seq2seq'] = cfg['seq2seq']
 # model_langs = ['en', 'fr']
 # model = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
-# model.apply(init_weights)
+# model.apply(init_weights);
 
 # Seq2Seq_Trans
+# model_cfg['seq2seq'] = cfg['seq2seq']
 # model_langs = ['en', 'fr']
 # model = Seq2SeqTransformer(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 
 # Piv
-# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+# model_cfg['seq2seq'] = cfg['seq2seq']
 # model_langs = ['en', 'fr', 'fr', 'en']
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[0], out_lang=model_langs[1], src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang=model_langs[2], out_lang=model_langs[3], src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
-# model.apply(init_weights)
+# model.apply(init_weights);
 
 # Piv Multi-Src
-cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
-model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
-# model = PivotSeq2SeqMultiSrc(cfg=cfg, submodel=model_0, device=device).to(device)
-model = PivotSeq2SeqMultiSrc_2(cfg=cfg, submodel=model_0, device=device).to(device)
-model.apply(init_weights)
+model_cfg['seq2seq'] = cfg['seq2seq']
+model_0 = Seq2SeqRNN(cfg=model_cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
+# model = PivotSeq2SeqMultiSrc(cfg=model_cfg, submodel=model_0, device=device).to(device)
+model = PivotSeq2SeqMultiSrc_2(cfg=model_cfg, submodel=model_0, device=device).to(device)
+model.apply(init_weights);
 
 # Tri
-# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+# model_cfg['seq2seq'] = cfg['seq2seq']
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # model_2 = Seq2SeqRNN(cfg=cfg, in_lang='fr', out_lang='fr', src_pad_idx=PAD_ID, device=device).to(device)
 # z_model = PivotSeq2Seq(cfg=cfg, models=[model_1, model_2], device=device).to(device)
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
+# model.apply(init_weights);
 
 # Multi-Src
-# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
 # model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
 # model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
-# model.apply(init_weights)
+# model.apply(init_weights);
+
+print('model_cfg:', json.dumps(model_cfg, indent=2))
 
 #%%
 
-load_model(model, './saved/Trans_en-fr_en-it-fr_time_0/ckpt_bestValid.pt')
-model_cfg = model.cfg
+load_model(model, os.path.join(model_dir, 'ckpt_bestTrain.pt'))
 if master_process: print('LOADED model')
 if master_process: print(model_cfg)
 
