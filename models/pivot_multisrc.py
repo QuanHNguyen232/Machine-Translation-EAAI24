@@ -14,13 +14,13 @@ import torch.nn.functional as F
 
 from .networks import EncoderRNN, AttentionRNN, DecoderRNN
 from .seq2seq import Seq2SeqRNN
-from .model_utils import init_weights
+from .model_utils import init_weights, set_model_freeze
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
 class PivotSeq2SeqMultiSrc(nn.Module):
   # For 1 models only
-  def __init__(self, cfg, submodel, device, verbose=False):
+  def __init__(self, cfg, submodel, device, is_freeze_submodels=False, verbose=False):
     super().__init__()
     self.cfg = copy.deepcopy(cfg)
     self.cfg.pop('seq2seq', '')
@@ -29,6 +29,7 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
     self.output_dim = cfg['seq2seq']['fr_DIM']
     
+    self.is_freeze_submodels = is_freeze_submodels
     self.verbose = verbose
     self.device = device
     self.add_submodel(submodel, cfg)
@@ -54,6 +55,10 @@ class PivotSeq2SeqMultiSrc(nn.Module):
   
   def set_share_emb(self):
     self.piv_enc.embedding = getattr(self, 'submodel').decoder.embedding
+  
+  def set_submodel_freeze(self):
+    if self.is_freeze_submodels:
+      set_model_freeze(getattr(self, 'submodel'), isFreeze=True)
 
   def create_mask(self, src):
     mask = (src != PAD_ID).permute(1, 0)
@@ -105,7 +110,8 @@ class PivotSeq2SeqMultiSrc(nn.Module):
     
     if criterion != None:
       pred_loss = self.compute_loss(outputs, trg, criterion)
-      final_loss = (pred_loss + submodel_loss) / 2
+      if self.is_freeze_submodels: final_loss = pred_loss
+      else: final_loss = (pred_loss + submodel_loss) / 2
       return final_loss, outputs, None
     else:
       return outputs, None
@@ -201,10 +207,11 @@ class PivotSeq2SeqMultiSrc(nn.Module):
 
 class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
   # For 1 models only
-  def __init__(self, cfg, submodel, device, verbose=False):
+  def __init__(self, cfg, submodel, device, is_freeze_submodels=False, verbose=False):
     super().__init__(cfg, submodel, device, verbose)
     self.cfg['model_id'] = self.modelname = 'pivMultiSrc_2_' + cfg['model_id']
     self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
+    self.is_freeze_submodels = is_freeze_submodels
     
     self.add_submodel(submodel, cfg)
     if self.cfg['piv']['is_share_emb']:
@@ -230,6 +237,10 @@ class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
   
   def set_share_emb(self):
     self.piv_enc.embedding = getattr(self, 'submodel').decoder.embedding
+
+  def set_submodel_freeze(self):
+    if self.is_freeze_submodels:
+      set_model_freeze(getattr(self, 'submodel'), isFreeze=True)
 
   def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
     if self.verbose: print('start forward')
@@ -268,7 +279,8 @@ class PivotSeq2SeqMultiSrc_2(PivotSeq2SeqMultiSrc):
     
     if criterion != None:
       pred_loss = self.compute_loss(outputs, trg, criterion)
-      final_loss = (pred_loss + submodel_loss) / 2
+      if self.is_freeze_submodels: final_loss = pred_loss
+      else: final_loss = (pred_loss + submodel_loss) / 2
       return final_loss, outputs, None
     else:
       return outputs, None

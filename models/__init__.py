@@ -14,7 +14,7 @@ from .pivot_trans import PivotTrans
 from .pivot_multisrc import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2
 
 from .triangulate import TriangSeq2Seq
-from .triangulate_multisrc import TriangSeq2SeqMultiSrc
+from .triangulate_multisrc import TriangSeq2SeqMultiSrc, TriangSeq2SeqMultiSrc_2
 
 from .model_utils import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model, set_model_freeze
 from .model_utils import train_epoch, eval_epoch

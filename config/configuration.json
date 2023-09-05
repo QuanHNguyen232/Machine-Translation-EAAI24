@@ -27,7 +27,7 @@
     "LR": 0.001,
     "NUM_ITERS": 30000,
     "CLIP": 1.0,
-    "model_id": "time_0",
+    "model_id": "new_loss_time_0",
     "scheduler": {"milestones": [0.35, 0.6, 0.9] ,"gamma": 0.3333333333333333},
     "save_dir": "saved/",
     "verbose_interval": 2000,

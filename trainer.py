@@ -24,7 +24,7 @@ from torchtext.data import Dataset, Example
 from dataset import get_tkzer_dict, get_field_dict
 from models import Seq2SeqRNN, PivotSeq2Seq, TriangSeq2Seq
 from models import Seq2SeqTransformer
-from models import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2, TriangSeq2SeqMultiSrc
+from models import PivotSeq2SeqMultiSrc, PivotSeq2SeqMultiSrc_2, TriangSeq2SeqMultiSrc, TriangSeq2SeqMultiSrc_2
 from models import update_trainlog, init_weights, count_parameters, save_cfg, save_model, load_model, set_model_freeze
 from models import train_epoch, eval_epoch
 from utils import util
@@ -55,7 +55,7 @@ if master_process: print(device, cfg)
 
 #%% get TKZERs & FIELDs
 
-langs = ['en', 'it', 'fr']
+langs = ['en', 'it', 'de', 'fr']
 
 tkzer_dict = get_tkzer_dict(langs)
 FIELD_DICT = get_field_dict(tkzer_dict)
@@ -120,11 +120,13 @@ if master_process: print(len(train_iterator), len(valid_iterator), len(test_iter
 # model.apply(init_weights)
 
 # Piv Multi-Src
-cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
-model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
+# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
 # model = PivotSeq2SeqMultiSrc(cfg=cfg, submodel=model_0, device=device).to(device)
-model = PivotSeq2SeqMultiSrc_2(cfg=cfg, submodel=model_0, device=device).to(device)
-model.apply(init_weights)
+# model = PivotSeq2SeqMultiSrc_2(cfg=cfg, submodel=model_0, device=device, is_freeze_submodels=True).to(device)
+# model.apply(init_weights)
+# load_model(model.submodel, '')
+# model.set_submodel_freeze()
 
 # Tri
 # cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
@@ -135,10 +137,15 @@ model.apply(init_weights)
 # model = TriangSeq2Seq(cfg=cfg, models=[model_0, z_model], device=device).to(device)
 
 # Multi-Src
-# cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
-# model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
+cfg['model_id'] = 'en-it-fr_' + cfg['model_id']
+model_0 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='de', src_pad_idx=PAD_ID, device=device).to(device)
+model_1 = Seq2SeqRNN(cfg=cfg, in_lang='en', out_lang='it', src_pad_idx=PAD_ID, device=device).to(device)
 # model = TriangSeq2SeqMultiSrc(cfg=cfg, models=[model_0], device=device).to(device)
-# model.apply(init_weights)
+model = TriangSeq2SeqMultiSrc_2(cfg=cfg, models=[model_0, model_1], device=device, is_freeze_submodels=False).to(device)
+model.apply(init_weights)
+# load_model(model_0, '')
+# load_model(model_1, '')
+model.set_submodel_freeze()
 
 model_cfg = model.cfg
 save_cfg(model_cfg)
@@ -149,9 +156,8 @@ if cfg['use_DDP']:
 
 #%%
 
-# load_model(model.submodel, '')
-# set_model_freeze(model.submodel, isFreeze=True)
-# print('requires_grad:', any([param.requires_grad for param in model.parameters()]))
+submodel = model.submodel_0
+print('requires_grad:', any([param.requires_grad for param in submodel.parameters()]))
 
 #%% LOAD criterion/optim/scheduler
 

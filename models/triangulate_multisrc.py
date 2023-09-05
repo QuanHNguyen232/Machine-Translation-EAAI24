@@ -14,10 +14,220 @@ import torch.nn.functional as F
 
 from .networks import EncoderRNN, AttentionRNN, DecoderRNN
 from .seq2seq import Seq2SeqRNN
-from .model_utils import init_weights
+from .model_utils import init_weights, set_model_freeze
 
 UNK_ID, PAD_ID, SOS_ID, EOS_ID = 0, 1, 2, 3
 
+class TriangSeq2SeqMultiSrc_2(nn.Module):
+  def __init__(self, cfg, models, device, is_freeze_submodels=False, verbose=False):
+    super().__init__()
+    self.cfg = copy.deepcopy(cfg)
+    self.cfg.pop('seq2seq', '')
+    # self.cfg.pop('piv', '')
+    self.cfg['model_id'] = self.modelname = 'triMultiSrc_2_' + cfg['model_id']
+    self.cfg['save_dir'] = self.save_dir = os.path.join(cfg['save_dir'], self.cfg['model_id'])
+    self.out_lang = 'fr'
+    self.output_dim = cfg['seq2seq']['fr_DIM']
+
+    self.is_freeze_submodels = is_freeze_submodels
+    self.verbose = verbose
+    self.device = device
+    self.add_submodel(models, cfg)
+    if self.cfg['piv']['is_share_emb']:
+      self.set_share_emb()
+      
+  def add_submodel(self, submodels, cfg):
+    self.num_submodels = len(submodels)
+    self.piv_langs = []
+    assert self.num_submodels == 2, f'only 2 for en-de & en-it. self.num_submodels={self.num_submodels}'
+    hid_dim = cfg['seq2seq']['HID_DIM']
+    emb_dim = cfg['seq2seq']['EMB_DIM']
+    dropout = cfg['seq2seq']['DROPOUT']
+    for i in range(self.num_submodels):
+      # Add submodel
+      self.add_module(f'submodel_{i}', submodels[i]) # en -> piv
+      self.cfg['piv'][f'submodel_{i}'] = submodels[i].cfg
+      piv_lang = submodels[i].cfg['seq2seq']['model_lang']['out_lang']
+      self.piv_langs.append(piv_lang)
+      # Encoders:
+      self.add_module(f'piv_{i}_enc', EncoderRNN(cfg['seq2seq'][f'{piv_lang}_DIM'], emb_dim, hid_dim, hid_dim, dropout))
+      # Attns:
+      self.add_module(f'piv_{i}_attn', AttentionRNN(hid_dim, hid_dim))
+    
+    # Encoder:
+    self.en_enc = EncoderRNN(cfg['seq2seq']['en_DIM'], emb_dim, hid_dim, hid_dim, dropout)
+    # Attn:
+    self.en_attn = AttentionRNN(hid_dim, hid_dim)
+    # Decoder:
+    self.decoder = DecoderRNN(self.output_dim, emb_dim, hid_dim, hid_dim, dropout)
+    # Hidden combine
+    self.fc = nn.Linear(hid_dim * (self.num_submodels + 1), hid_dim) # = submodels + en
+  
+  def set_share_emb(self):
+    for i in range(self.num_submodels):
+      getattr(self, f'piv_{i}_enc').embedding = getattr(self, f'submodel_{i}').decoder.embedding
+  
+  def set_submodel_freeze(self):
+    if self.is_freeze_submodels:
+      for i in range(self.num_submodels):
+        set_model_freeze(getattr(self, f'submodel_{i}'), isFreeze=True)
+
+  def create_mask(self, src):
+    mask = (src != PAD_ID).permute(1, 0)
+    return mask
+
+  def forward(self, batch: dict, model_cfg, criterion=None, teacher_forcing_ratio=0.5):
+    if self.verbose: print('start forward')
+    submodel_losses, submodel_outputs, materials = self.run_submodel(batch, model_cfg, criterion, teacher_forcing_ratio)
+    
+    # Run Encoders on PIV
+    encoder_outputs, hiddens, masks = self.run_encoder(batch, submodel_outputs, teacher_forcing_ratio)
+    if self.verbose: print('\tforward: get piv out/hid/mask from run_encoder')
+    # Combine
+    attn_models = [getattr(self, f'piv_{i}_attn') for i in range(self.num_submodels)] + [self.en_attn]
+    hidden = torch.tanh(self.fc(torch.cat(hiddens, dim = 1)))
+    if self.verbose: print('\tforward: combine hidden state')
+
+    # Predict (similar to seq2seq)
+    trg, _ = batch['fr']
+    batch_size = trg.shape[1]
+    trg_len = trg.shape[0]
+    trg_vocab_size = self.decoder.output_dim
+    outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
+    if self.verbose: print('\tforward: start predicting')
+
+    #first input to the decoder is the <sos> tokens
+    input = trg[0,:]
+
+    for t in range(1, trg_len):
+      #insert input token embedding, previous hidden state, all encoder hidden states and mask
+      #receive output tensor (predictions) and new hidden state
+      output, hidden, _ = self.decoder(input, hidden, encoder_outputs, masks, attn_models)
+
+      #place predictions in a tensor holding predictions for each token
+      outputs[t] = output
+
+      #if teacher forcing, use actual next token as next input. Else, use predicted token
+      input = trg[t] if random.random() < teacher_forcing_ratio else output.argmax(1)
+    
+    if criterion != None:
+      pred_loss = self.compute_loss(outputs, trg, criterion)
+      if self.is_freeze_submodels: final_loss = pred_loss
+      else:
+        submodel_loss = self.compute_submodels_loss(submodel_losses)
+        final_loss = (pred_loss + submodel_loss) / 3
+        if self.verbose: print('end forward')
+      return final_loss, outputs, None
+    else:
+      if self.verbose: print('end forward')
+      return outputs, None
+
+  def run_encoder(self, batch, submodel_outputs, teacher_forcing_ratio):
+    ''' Run for "piv_0", "piv_1" and "en" lang
+    '''
+    if self.verbose: print('start run_encoder')
+    enc_out_list, hid_list, mask_list = [], [], []
+    for i, lang in enumerate(self.piv_langs + ['en']):
+      if lang == 'en':
+        src, src_len = batch[lang]
+        if self.verbose: print('\trun_encoder: get src, src_len for en')
+      else:
+        src, src_len = batch[lang] if random.random() < teacher_forcing_ratio else self.process_output(submodel_outputs[i])
+        if self.verbose: print('\trun_encoder: get src, src_len for', lang)
+
+      # SORT: prep input for encoder
+      sort_ids, unsort_ids = self.sort_by_sent_len(src_len)
+      src, src_len = src[:, sort_ids], src_len[sort_ids]
+      if self.verbose: print('\trun_encoder: sorted lang for', lang)
+
+      enc = getattr(self, 'en_enc') if lang == 'en' else getattr(self, f'piv_{i}_enc')
+      encoder_output, hidden = enc(src, src_len)
+      # UNSORT
+      encoder_output = encoder_output[:, unsort_ids, :] #shape = [src len, batch size, enc hid dim * 2]
+      hidden = hidden[unsort_ids, :] #shape = [batch size, dec hid dim]
+      if self.verbose: print('\trun_encoder: get enc_out, hidden for', lang)
+
+      mask = self.create_mask(src)
+      if self.verbose: print('\trun_encoder: get mask for', lang)
+
+      enc_out_list.append(encoder_output)
+      hid_list.append(hidden)
+      mask_list.append(mask)
+
+    if self.verbose: print('end run_encoder')
+    return enc_out_list, hid_list, mask_list
+  
+  def run_submodel(self, batch, model_cfg, criterion, teacher_forcing_ratio):
+    ''' return:
+    material: submodel_loss, submodel_output, material (enc_hid, enc_out, enc_mask)
+    '''
+    # Seq2Seq model already sort src by src_len in forward
+    if self.verbose: print('start run_submodel')
+    submodel_losses, submodel_outputs, materials = [], [], []
+    for i in range(self.num_submodels):
+      submodel = getattr(self, f'submodel_{i}')
+      submodel_cfg = model_cfg['piv'][f'submodel_{i}']
+      if self.verbose: print('\trun_submodel: get model id=', i, 'lang=', submodel_cfg['seq2seq']['model_lang']['out_lang'])
+      output = submodel(batch, submodel_cfg, criterion, 0 if criterion==None else teacher_forcing_ratio)
+      if criterion != None:
+        submodel_losses.append(output[0])
+        submodel_outputs.append(output[1])
+      else:
+        submodel_outputs.append(output[0])
+      materials.append(output[-1])
+    
+    if self.verbose: print('end run_submodel')
+    return submodel_losses, submodel_outputs, materials
+
+  def compute_submodels_loss(self, loss_list):
+    total_loss = 0.0
+    for loss in loss_list:
+      total_loss += loss
+    return total_loss
+
+  def compute_loss(self, output, trg, criterion):
+    #output = (trg_len, batch_size, trg_vocab_size)
+    #trg = [seq_len, batch_size]
+    output = output[1:].reshape(-1, output.shape[-1])  #output = [(trg len - 1) * batch size, output dim]
+    trg = trg[1:].reshape(-1)  #trg = [(trg len - 1) * batch size]
+    loss = criterion(output, trg)
+    return loss
+  
+  def process_output(self, output):
+    # output = [trg len, batch size, output dim]
+    # trg = [trg len, batch size]
+    # Process output1 to be input for model2
+    seq_len, N, _ = output.shape
+    tmp_out = output.argmax(2)  # tmp_out = [seq_len, batch_size]
+    # re-create pivot as src for model2
+    piv = torch.zeros_like(tmp_out).type(torch.long).to(output.device)
+    piv[0, :] = torch.full_like(piv[0, :], SOS_ID)  # fill all first idx with sos_token
+
+    for i in range(1, seq_len):  # for each i in seq_len
+      # if tmp_out's prev is eos_token, replace w/ pad_token, else current value
+      eos_mask = (tmp_out[i-1, :] == EOS_ID)
+      piv[i, :] = torch.where(eos_mask, PAD_ID, tmp_out[i, :])
+      # if piv's prev is pad_token, replace w/ pad_token, else current value
+      pad_mask = (piv[i-1, :] == PAD_ID)
+      piv[i, :] = torch.where(pad_mask, PAD_ID, piv[i, :])
+
+    # Trim down extra pad tokens
+    tensor_list = [piv[i] for i in range(seq_len) if not all(piv[i] == PAD_ID)]  # tensor_list = [new_seq_len, batch_size]
+    piv = torch.stack([x for x in tensor_list], dim=0).type(torch.long).to(output.device)
+    assert not all(piv[-1] == PAD_ID), 'Not completely trim down tensor'
+
+    # get seq_id + eos_tok id of each sequence
+    piv_ids, eos_ids = (piv.permute(1, 0) == EOS_ID).nonzero(as_tuple=True)  # piv_len = [N]
+    piv_len = torch.full_like(piv[0], seq_len).type(torch.long)  # init w/ longest seq
+    piv_len[piv_ids] = eos_ids + 1 # seq_len = eos_tok + 1
+
+    return piv, piv_len
+  
+  def sort_by_sent_len(self, sent_len):
+    _, sort_ids = sent_len.sort(descending=True)
+    unsort_ids = sort_ids.argsort()
+    return sort_ids, unsort_ids
+  
 class TriangSeq2SeqMultiSrc(nn.Module):
   def __init__(self, cfg, models: list, device, verbose=False):
     super().__init__()
