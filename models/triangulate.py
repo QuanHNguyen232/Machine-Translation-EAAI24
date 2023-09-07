@@ -44,8 +44,6 @@ class TriangSeq2Seq(nn.Module):
 
   def add_submodels(self, models: list):
     for i, submodel in enumerate(models):
-      # validity check
-      assert isinstance(submodel, Seq2SeqRNN) or isinstance(submodel, PivotSeq2Seq), f'{type(submodel)} != Seq2SeqRNN or PivotSeq2Seq'
       # add submodel
       self.cfg['tri'][f'model_{i}'] = submodel.cfg
       self.add_module(f'model_{i}', submodel)
